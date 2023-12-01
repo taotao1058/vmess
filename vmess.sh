@@ -23,7 +23,7 @@ warn() {
 
 # Check if xray is already installed
 if type xray &>/dev/null; then
-    echo "检测到 xray 已安装."
+    warn "检测到 xray 已安装."
     exit 1
 fi
 
@@ -45,6 +45,15 @@ read -p "请输入 SOCKS5 代理地址: " socks5_address
 read -p "请输入 SOCKS5 代理端口: " socks5_port
 read -p "请输入 SOCKS5 代理用户名: " socks5_username
 read -p "请输入 SOCKS5 代理密码: " socks5_password
+
+# Get local IPv4 address
+local_ip=$(curl -s http://api64.ipify.org)
+
+# Check if local_ip is a valid IPv4 address
+if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    warn "无法获取本机IPv4地址，请手动输入."
+    read -p "请输入服务器的IPv4地址: " local_ip
+fi
 
 # Generate xray configuration file
 cat << EOF > /usr/local/etc/xray/config.json
@@ -90,4 +99,4 @@ systemctl restart xray
 
 # Display one-click connection information
 echo -e "\n${green}一键连接信息:${none}"
-echo -e "${green}vmess://${vmess_id}@<your-server-ip>:${vmess_port}?encryption=none${none}\n"
+echo -e "${green}vmess://${vmess_id}@${local_ip}:${vmess_port}?encryption=none${none}\n"
