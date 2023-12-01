@@ -95,5 +95,5 @@ systemctl restart xray
 
 # Display one-click connection information
 vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"$local_ip\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
-echo -e "\n${yellow}（TG大漂亮脚本）一键连接信息:${none}"
+echo -e "\n${yellow}（听风自用脚本）一键连接信息:${none}"
 echo -e "${yellow}$vmess_info${none}\n"
