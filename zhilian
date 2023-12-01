@@ -29,9 +29,6 @@ fi
 vmess_port=$(shuf -i 10000-65535 -n 1)
 vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
-# Prompt user for socks5 proxy information
-read -p "请输入落地 SOCKS5 地址: " socks5_address
-
 # Set fixed values for socks5 proxy
 socks5_port=9999
 
