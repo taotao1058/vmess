@@ -94,6 +94,6 @@ EOF
 systemctl restart xray
 
 # Display one-click connection information
-vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"$local_ip\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":64,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\",\"host\":\"$local_ip\"}" | base64 -w 0)"
+vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"$local_ip\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\",\"host\":\"$local_ip\"}" | base64 -w 0)"
 echo -e "\n${yellow}一键连接信息:${none}"
 echo -e "${yellow}$vmess_info${none}\n"
