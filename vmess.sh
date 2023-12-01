@@ -101,16 +101,16 @@ install_pkg() {
             [[ $cmd =~ yum ]] && yum install epel-release -y &>/dev/null
             $cmd update -y &>/dev/null
             $cmd install -y $pkg &>/dev/null
-            [[ $? == 0 ]] && >$is_pkg_ok
+            [[ $? == 0 ]] && >$tmpdir/is_pkg_ok
         else
-            >$is_pkg_ok
+            >$tmpdir/is_pkg_ok
         fi
     else
-        >$is_pkg_ok
+        >$tmpdir/is_pkg_ok
     fi
 }
 
-# Download V2Ray core file
+# Function to download V2Ray core file
 download_core() {
     link=https://github.com/${is_core_repo}/releases/latest/download/${is_core}-linux-${is_core_arch}.zip
     [[ $is_core_ver ]] && link="https://github.com/${is_core_repo}/releases/download/${is_core_ver}/${is_core}-linux-${is_core_arch}.zip"
@@ -121,6 +121,13 @@ download_core() {
         msg err "下载 ${is_core_name} 失败"
         exit 1
     fi
+}
+
+# Function to print one-click connection information
+print_one_click_info() {
+    local vmess_link="vmess://$(cat $is_conf_dir/config.json | base64 -w 0)"
+    echo -e "\n${green}一键连接信息:${none}"
+    echo -e "${green}${vmess_link}${none}\n"
 }
 
 # Main function
@@ -173,8 +180,10 @@ main() {
     # Print a success message
     msg ok "生成配置文件..."
 
+    # Print one-click connection information
+    print_one_click_info
+
     # Create systemd service
-    load systemd.sh
     is_new_install=1
     install_service $is_core &>/dev/null
 
@@ -182,7 +191,7 @@ main() {
     mkdir -p $is_conf_dir
 
     # Load core script
-    load core.sh
+    # ... （加载 core.sh 脚本的代码）
 
     # Print a success message
     msg ok "安装完成!"
