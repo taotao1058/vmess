@@ -30,10 +30,10 @@ vmess_port=$(shuf -i 10000-65535 -n 1)
 vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
 # Prompt user for socks5 proxy information
-read -p "请输入 SOCKS5 代理地址: " socks5_address
-read -p "请输入 SOCKS5 代理端口: " socks5_port
-read -p "请输入 SOCKS5 代理用户名: " socks5_username
-read -p "请输入 SOCKS5 代理密码: " socks5_password
+read -p "请输入落地 SOCKS5 地址: " socks5_address
+read -p "请输入落地 SOCKS5 端口: " socks5_port
+read -p "请输入落地 SOCKS5 用户名: " socks5_username
+read -p "请输入落地 SOCKS5 密码: " socks5_password
 
 # Get local IPv4 address
 local_ip=$(curl -s http://api64.ipify.org)
@@ -94,6 +94,6 @@ EOF
 systemctl restart xray
 
 # Display one-click connection information
-vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"$local_ip\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\",\"host\":\"$local_ip\"}" | base64 -w 0)"
-echo -e "\n${yellow}一键连接信息:${none}"
+vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"$local_ip\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
+echo -e "\n${yellow}（TG听风脚本）一键连接信息:${none}"
 echo -e "${yellow}$vmess_info${none}\n"
