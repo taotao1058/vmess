@@ -23,17 +23,16 @@ warn() {
 
 # Check if xray is already installed
 if type xray &>/dev/null; then
-    warn "检测到 xray 已安装."
-    exit 1
-fi
+    warn "检测到 xray 已安装，继续执行后续步骤."
+else
+    # Install xray
+    echo "正在安装 xray..."
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
 
-# Install xray
-echo "正在安装 xray..."
-bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
-
-# Check if xray installation is successful
-if ! type xray &>/dev/null; then
-    err "xray 安装失败，请检查安装脚本是否正常运行."
+    # Check if xray installation is successful
+    if ! type xray &>/dev/null; then
+        err "xray 安装失败，请检查安装脚本是否正常运行."
+    fi
 fi
 
 # Generate random vmess port and id
@@ -60,15 +59,22 @@ cat << EOF > /usr/local/etc/xray/config.json
 {
     "inbounds": [
         {
+            "listen": "0.0.0.0",
             "port": $vmess_port,
             "protocol": "vmess",
             "settings": {
                 "clients": [
                     {
-                        "id": "$vmess_id",
-                        "alterId": 64
+                        "id": "$vmess_id"
                     }
                 ]
+            },
+            "streamSettings": {
+                "network": "ws",
+                "security": "none",
+                "wsSettings": {
+                    "path": "/dockerlnmp"
+                }
             }
         }
     ],
