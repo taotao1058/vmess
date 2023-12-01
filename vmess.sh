@@ -59,7 +59,7 @@ is_sh_bin=/usr/local/bin/$is_core
 is_sh_dir=$is_core_dir/sh
 is_sh_repo=233boy/$is_core
 is_pkg="wget unzip"
-is_config_json=$is_conf_dir/config.json
+is_config_json=$is_core_dir/config.json
 
 # Temporary directory
 tmpdir=$(mktemp -u)
