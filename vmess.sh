@@ -59,7 +59,7 @@ is_sh_bin=/usr/local/bin/$is_core
 is_sh_dir=$is_core_dir/sh
 is_sh_repo=233boy/$is_core
 is_pkg="wget unzip"
-is_config_json=$is_core_dir/config.json
+is_config_json=$is_conf_dir/config.json
 
 # Temporary directory
 tmpdir=$(mktemp -u)
@@ -123,9 +123,39 @@ download_core() {
     fi
 }
 
+# Function to generate V2Ray configuration file
+generate_config() {
+    msg warn "生成配置文件..."
+    mkdir -p $is_conf_dir
+    cat << EOF > $is_config_json
+{
+    "inbounds": [
+        {
+            "port": 10000,
+            "protocol": "vmess",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "b831381d-6324-4d53-ad4f-8cda48b30811",
+                        "alterId": 64
+                    }
+                ]
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "freedom",
+            "settings": {}
+        }
+    ]
+}
+EOF
+}
+
 # Function to print one-click connection information
 print_one_click_info() {
-    local vmess_link="vmess://$(cat $is_conf_dir/config.json | base64 -w 0)"
+    local vmess_link="vmess://$(cat $is_config_json | base64 -w 0)"
     echo -e "\n${green}一键连接信息:${none}"
     echo -e "${green}${vmess_link}${none}\n"
 }
@@ -171,6 +201,9 @@ main() {
     # Download V2Ray core
     download_core
 
+    # Generate V2Ray configuration file
+    generate_config
+
     # Create core command
     ln -sf $is_core_dir/sh/$is_core.sh $is_sh_bin
 
@@ -178,23 +211,10 @@ main() {
     mkdir -p $is_log_dir
 
     # Print a success message
-    msg ok "生成配置文件..."
+    msg ok "安装完成!"
 
     # Print one-click connection information
     print_one_click_info
-
-    # Create systemd service
-    is_new_install=1
-    install_service $is_core &>/dev/null
-
-    # Create configuration directory
-    mkdir -p $is_conf_dir
-
-    # Load core script
-    # ... （加载 core.sh 脚本的代码）
-
-    # Print a success message
-    msg ok "安装完成!"
 }
 
 # Start
