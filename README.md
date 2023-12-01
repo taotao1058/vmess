@@ -17,3 +17,8 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/ziyo
 
 ---
 
+###  直连
+
+```
+wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/zhilian && bash zhilian
+```
