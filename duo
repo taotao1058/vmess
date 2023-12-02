@@ -1,133 +1,109 @@
 #!/bin/bash
 
-# Define colors
 red='\e[31m'
 yellow='\e[33m'
 green='\e[32m'
 none='\e[0m'
 
-# Check if running as root
+if ! type curl &>/dev/null; then
+    echo -e "\n${red}错误!${none} 需要安装 ${yellow}curl.${none}\n" && exit 1
+fi
+
 [[ $EUID != 0 ]] && {
     echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}\n" && exit 1
 }
 
-# Check if xray is already installed
 if type xray &>/dev/null; then
     echo "检测到 xray 已安装，继续执行后续步骤."
 else
-    # Install xray
     echo "正在安装 xray..."
     bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
-
-    # Check if xray installation is successful
     if ! type xray &>/dev/null; then
         echo -e "\n${red}错误!${none} xray 安装失败，请检查安装脚本是否正常运行.\n" && exit 1
     fi
 fi
 
-# Get local IPv4 address
 local_ip=$(curl -s http://api64.ipify.org)
-
-# Check if local_ip is a valid IPv4 address
 if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "无法获取本机IPv4地址，请手动输入."
     read -p "请输入本机的IP地址: " local_ip
+    if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "\n${red}错误!${none} 无效的IP地址.\n" && exit 1
+    fi
 fi
 
-# Create a directory to store xray configurations
 config_dir="/usr/local/etc/xray"
 mkdir -p "$config_dir"
 
-# Remove existing xray configuration files
-rm -f "$config_dir/config_inbound_*.json"
-rm -f "$config_dir/config.json"
-
-# Prompt user for the number of inbound nodes
 read -p "请输入要添加落地socks5的数量: " num_inbounds
+if ! [[ $num_inbounds =~ ^[0-9]+$ ]]; then
+    echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
+fi
 
-# Generate xray configuration file for each inbound node
 total_config="$config_dir/config.json"
-echo "[" > "$total_config"  # Start of JSON array
+echo "{" > "$total_config"
+echo "  \"inbounds\": [" >> "$total_config"
 
 for ((i=1; i<=num_inbounds; i++)); do
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
+    vmess_port=$((10000 + i))
 
-    # Prompt user for socks5 proxy information for each inbound node
+    cat >> "$total_config" << EOF
+    {
+        "listen": "0.0.0.0",
+        "port": $vmess_port,
+        "protocol": "vmess",
+        "settings": {
+            "clients": [
+                {
+                    "id": "$vmess_id"
+                }
+            ]
+        },
+        "streamSettings": {
+            "network": "ws",
+            "security": "none",
+            "wsSettings": {
+                "path": "/dockerlnmp"
+            }
+        }
+    }$(if [[ $i -lt $num_inbounds ]]; then echo ","; fi)
+EOF
+done
+
+echo "  ]," >> "$total_config"
+echo "  \"outbounds\": [" >> "$total_config"
+
+for ((i=1; i<=num_inbounds; i++)); do
     read -p "请输入第 $i 个落地 SOCKS5 地址: " outbound_address
     read -p "请输入第 $i 个落地 SOCKS5 端口: " socks5_port
     read -p "请输入第 $i 个落地 SOCKS5 用户名: " socks5_username
     read -p "请输入第 $i 个落地 SOCKS5 密码: " socks5_password
 
-    vmess_port=$((10000 + i))
-    config_file="$config_dir/config_inbound_$i.json"
-
-    # Generate xray configuration file for each inbound node
-    cat > "$config_file" << EOF
-{
-    "inbounds": [
-        {
-            "listen": "0.0.0.0",
-            "port": $vmess_port,
-            "protocol": "vmess",
-            "settings": {
-                "clients": [
-                    {
-                        "id": "$vmess_id"
-                    }
-                ]
-            },
-            "streamSettings": {
-                "network": "ws",
-                "security": "none",
-                "wsSettings": {
-                    "path": "/dockerlnmp"
+    cat >> "$total_config" << EOF
+    {
+        "protocol": "socks",
+        "settings": {
+            "servers": [
+                {
+                    "address": "$outbound_address",
+                    "port": $socks5_port,
+                    "users": [
+                        {
+                            "user": "$socks5_username",
+                            "pass": "$socks5_password"
+                        }
+                    ]
                 }
-            }
+            ]
         }
-    ],
-    "outbounds": [
-        {
-            "protocol": "socks",
-            "settings": {
-                "servers": [
-                    {
-                        "address": "$outbound_address",
-                        "port": $socks5_port,
-                        "users": [
-                            {
-                                "user": "$socks5_username",
-                                "pass": "$socks5_password"
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-    ]
-}
+    }$(if [[ $i -lt $num_inbounds ]]; then echo ","; fi)
 EOF
-
-    # Append the individual config to the total config
-    cat "$config_file" >> "$total_config"
-    # Add a comma to separate individual configs (except for the last one)
-    [[ $i -lt $num_inbounds ]] && echo "," >> "$total_config"
-
-    # Display connection information for each inbound node
-    vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
-    echo -e "\n${yellow}节点 $i 链接:${none}"
-    echo -e "${yellow}$vmess_info${none}\n"
-
-    # Display corresponding outbound information
-    echo -e "${yellow}节点 $i 对应的落地 SOCKS5 代理信息:${none}"
-    echo -e "${yellow}SOCKS5 地址: $outbound_address${none}"
-    echo -e "${yellow}SOCKS5 端口: $socks5_port${none}"
 done
 
-echo "]" >> "$total_config"  # End of JSON array
+echo "  ]" >> "$total_config"
+echo "}" >> "$total_config"
 
-# Restart xray with all configurations
 if [[ $num_inbounds -gt 0 ]]; then
-    echo -e "\n${green}（听风脚本）已生成 $num_inbounds 个节点配置文件，正在启动。。。配置文件路径为/usr/local/etc/xray${none}"
-    ls "$config_dir"/*.json
-    xray run -c "$total_config" &
+    systemctl restart xray
 fi
