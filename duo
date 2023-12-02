@@ -122,6 +122,7 @@ if [[ $num_configs -gt 0 ]]; then
     for config in "$config_dir"/*.json; do
         xray -config "$config" &
     done
+    echo "${green}启动成功${none}"
 else
     echo -e "\n${red}未找到任何配置文件.请检查后重新运行脚本${none}\n"
 fi
