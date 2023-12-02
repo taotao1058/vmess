@@ -48,10 +48,10 @@ for ((i=1; i<=num_inbounds; i++)); do
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
     # Prompt user for socks5 proxy information for each inbound node
-    read -p "请输入第 $i 个入站节点的落地 SOCKS5 端口: " socks5_port
-    read -p "请输入第 $i 个入站节点的落地 SOCKS5 用户名: " socks5_username
-    read -p "请输入第 $i 个入站节点的落地 SOCKS5 密码: " socks5_password
-    read -p "请输入第 $i 个入站节点的出站地址: " outbound_address
+    read -p "请输入第 $i 个落地 SOCKS5 地址: " outbound_address
+    read -p "请输入第 $i 个落地 SOCKS5 端口: " socks5_port
+    read -p "请输入第 $i 个落地 SOCKS5 用户名: " socks5_username
+    read -p "请输入第 $i 个落地 SOCKS5 密码: " socks5_password
 
     vmess_port=$((10000 + i))
     config_file="$config_dir/config_inbound_$i.json"
@@ -108,11 +108,9 @@ EOF
     echo -e "${yellow}$vmess_info${none}\n"
 
     # Display corresponding outbound information
-    echo -e "对应的出站 SOCKS5 代理信息:"
-    echo -e "服务器地址: $outbound_address"
-    echo -e "服务器端口: $socks5_port"
-    echo -e "用户名: $socks5_username"
-    echo -e "密码: $socks5_password\n"
+    echo -e "对应的落地 SOCKS5 代理信息:"
+    echo -e "SOCKS5 地址: $outbound_address"
+    echo -e "SOCKS5 端口: $socks5_port"
 done
 
 # Restart xray with all configurations
