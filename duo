@@ -43,6 +43,16 @@ if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
     echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
 fi
 
+# 检查端口是否被占用并强制释放端口
+free_port() {
+    local port=$1
+    local pid=$(lsof -t -i:$port -sTCP:LISTEN)
+    if [ ! -z "$pid" ]; then
+        echo -e "${yellow}警告: 端口 $port 已被进程 $pid 占用, 正在尝试释放...${none}"
+        kill -9 $pid
+    fi
+}
+
 total_config="$config_dir/config.json"
 echo "{" > "$total_config"
 echo "  \"inbounds\": [" >> "$total_config"
@@ -51,8 +61,10 @@ declare -A vmess_links
 declare -A outbound_addresses
 
 for ((i=1; i<=num_nodes; i++)); do
-    vmess_id=$(cat /proc/sys/kernel/random/uuid)
     vmess_port=$((10000 + i))
+    free_port $vmess_port
+
+    vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
     cat >> "$total_config" << EOF
     {
