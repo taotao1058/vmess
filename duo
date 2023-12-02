@@ -123,5 +123,5 @@ if [[ $num_configs -gt 0 ]]; then
         xray -config "$config" &
     done
 else
-    echo -e "\n${red}未找到任何配置文件.${none}\n"
+    echo -e "\n${red}未找到任何配置文件.请检查后重新运行脚本${none}\n"
 fi
