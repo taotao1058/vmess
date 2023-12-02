@@ -25,6 +25,9 @@ else
     fi
 fi
 
+# Clear all existing xray configuration files
+rm -f /usr/local/etc/xray/*.json
+
 # Generate random vmess port and id
 vmess_port=$(shuf -i 10000-65535 -n 1)
 vmess_id=$(cat /proc/sys/kernel/random/uuid)
