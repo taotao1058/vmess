@@ -31,3 +31,15 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/SS &
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duo && bash duo
 ```
 ---
+
+###  多端口对应多个出站（vmess+ws前置）快速配置版
+
+```
+wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duos && bash duos
+```
+
+
+---
+
+
+
