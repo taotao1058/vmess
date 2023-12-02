@@ -25,6 +25,9 @@ else
     fi
 fi
 
+# Clear all existing xray configuration files
+rm -f /usr/local/etc/xray/*.json
+
 # Generate random Shadowsocks port and password
 ss_port=$(shuf -i 10000-65535 -n 1)
 ss_password=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 16)
