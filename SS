@@ -25,10 +25,6 @@ else
     fi
 fi
 
-# Generate random Shadowsocks port and password
-ss_port=$(shuf -i 10000-65535 -n 1)
-ss_password=$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 16)
-
 # Prompt user for socks5 proxy information
 read -p "请输入落地 SOCKS5 地址: " socks5_address
 read -p "请输入落地 SOCKS5 端口: " socks5_port
@@ -50,17 +46,14 @@ cat << EOF > /usr/local/etc/xray/config.json
     "inbounds": [
         {
             "listen": "0.0.0.0",
-            "port": $ss_port,
+            "port": 15388,
             "protocol": "shadowsocks",
             "settings": {
                 "method": "chacha20-ietf-poly1305",
-                "password": "$ss_password",
-                "network": "tcp",
-                "tcpSettings": {
-                    "header": {
-                        "type": "none"
-                    }
-                }
+                "password": "ADMINss"
+            },
+            "streamSettings": {
+                "network": "tcp"
             }
         }
     ],
@@ -90,6 +83,6 @@ EOF
 systemctl restart xray
 
 # Display one-click connection information
-ss_info="ss://$(echo -n "${ss_password}@${local_ip}:${ss_port}" | base64 -w 0 | tr '+/' '-_')"
+ss_info="ss://$(echo -n "ADMINss@${local_ip}:15388" | base64 -w 0 | tr '+/' '-_')"
 echo -e "\n${yellow}（听风-脚本）节点链接:${none}"
 echo -e "${yellow}$ss_info${none}\n"
