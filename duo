@@ -129,5 +129,9 @@ echo "]" >> "$total_config"  # End of JSON array
 if [[ $num_inbounds -gt 0 ]]; then
     echo -e "\n${green}（听风脚本）已生成 $num_inbounds 个节点配置文件，正在启动。。。配置文件路径为/usr/local/etc/xray${none}"
     ls "$config_dir"/*.json
+
+    # 等待一段时间，确保 Xray 已经启动
+    sleep 5
+
     xray run -c "$total_config" &
 fi
