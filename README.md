@@ -22,3 +22,5 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/ziyo
 ```
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/SS && bash SS
 ```
+
+---
