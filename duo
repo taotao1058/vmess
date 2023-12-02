@@ -30,7 +30,7 @@ local_ip=$(curl -s http://api64.ipify.org)
 # Check if local_ip is a valid IPv4 address
 if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "无法获取本机IPv4地址，请手动输入."
-    read -p "请输入服务器的IPv4地址: " local_ip
+    read -p "请输入本机的IP地址: " local_ip
 fi
 
 # Create a directory to store xray configurations
@@ -41,7 +41,7 @@ mkdir -p "$config_dir"
 rm -f "$config_dir/config_inbound_*.json"
 
 # Prompt user for the number of inbound nodes
-read -p "请输入要添加的入站节点数量: " num_inbounds
+read -p "请输入要添加落地socks5的数量: " num_inbounds
 
 # Generate xray configuration file for each inbound node
 for ((i=1; i<=num_inbounds; i++)); do
