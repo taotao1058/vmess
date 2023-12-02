@@ -33,12 +33,15 @@ if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     read -p "请输入服务器的IPv4地址: " local_ip
 fi
 
-# Prompt user for the number of inbound nodes
-read -p "请输入要添加的入站节点数量: " num_inbounds
-
 # Create a directory to store xray configurations
 config_dir="/usr/local/etc/xray/nodes"
 mkdir -p "$config_dir"
+
+# Remove existing xray configuration files
+rm -f "$config_dir/config_inbound_*.json"
+
+# Prompt user for the number of inbound nodes
+read -p "请输入要添加的入站节点数量: " num_inbounds
 
 # Generate xray configuration file for each inbound node
 for ((i=1; i<=num_inbounds; i++)); do
