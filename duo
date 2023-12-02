@@ -108,9 +108,9 @@ EOF
     echo -e "${yellow}$vmess_info${none}\n"
 
     # Display corresponding outbound information
-    echo -e "${yellow}节点 $i 对应的落地 SOCKS5 代理信息:"
-    echo -e "${yellow}SOCKS5 地址: $outbound_address"
-    echo -e "${yellow}SOCKS5 端口: $socks5_port"
+    echo -e "节点 $i 对应的落地 SOCKS5 代理信息:"
+    echo -e "SOCKS5 地址: $outbound_address"
+    echo -e "SOCKS5 端口: $socks5_port"
 done
 
 # Restart xray with all configurations
