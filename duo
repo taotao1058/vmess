@@ -47,7 +47,7 @@ read -p "请输入要添加落地socks5的数量: " num_inbounds
 
 # Generate xray configuration file for each inbound node
 total_config="$config_dir/config.json"
-echo "{" > "$total_config"  # Start of JSON object
+echo "[" > "$total_config"  # Start of JSON array
 
 for ((i=1; i<=num_inbounds; i++)); do
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
@@ -123,7 +123,7 @@ EOF
     echo -e "${yellow}SOCKS5 端口: $socks5_port${none}"
 done
 
-echo "}" >> "$total_config"  # End of JSON object
+echo "]" >> "$total_config"  # End of JSON array
 
 # Restart xray with all configurations
 if [[ $num_inbounds -gt 0 ]]; then
