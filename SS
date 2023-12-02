@@ -84,6 +84,6 @@ EOF
 systemctl restart xray
 
 # Display one-click connection information
-ss_info="ss://$(echo -n "${ss_password}@${local_ip}:${ss_port}" | base64 -w 0)"
+ss_info="ss://$(echo -n "${ss_password}@${local_ip}:${ss_port}" | base64 -w 0 | tr '+/' '-_')"
 echo -e "\n${yellow}（听风-脚本）节点链接:${none}"
 echo -e "${yellow}$ss_info${none}\n"
