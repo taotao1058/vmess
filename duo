@@ -118,5 +118,5 @@ done
 num_configs=$(ls "$config_dir"/*.json 2>/dev/null | wc -l)
 if [[ $num_configs -gt 0 ]]; then
     echo -e "\n${green}（听风脚本）已生成 $num_configs 个节点配置文件，正在启动。。。配置文件路径为/usr/local/etc/xray/nodes${none}"
-    xray run "$config_dir"/*.json &
+    xray run "/usr/local/etc/xray/nodes"/*.json &
 fi
