@@ -38,8 +38,8 @@ mkdir -p "$config_dir"
 # 删除现有的xray配置文件
 rm -f "$config_dir"/*.json
 
-read -p "请输入要添加落地socks5的数量: " num_inbounds
-if ! [[ $num_inbounds =~ ^[0-9]+$ ]]; then
+read -p "请输入要添加的节点数量: " num_nodes
+if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
     echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
 fi
 
@@ -47,7 +47,10 @@ total_config="$config_dir/config.json"
 echo "{" > "$total_config"
 echo "  \"inbounds\": [" >> "$total_config"
 
-for ((i=1; i<=num_inbounds; i++)); do
+declare -A vmess_links
+declare -A outbound_addresses
+
+for ((i=1; i<=num_nodes; i++)); do
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
     vmess_port=$((10000 + i))
 
@@ -69,19 +72,21 @@ for ((i=1; i<=num_inbounds; i++)); do
             "wsSettings": {
                 "path": "/dockerlnmp"
             }
-        }
-    }$(if [[ $i -lt $num_inbounds ]]; then echo ","; fi)
+        },
+        "tag": "inbound$i"
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
 EOF
 
     vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$i\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
-    echo -e "\n${yellow}节点 $i 链接:${none} $vmess_link"
+    vmess_links[$i]="$vmess_link"
 done
 
 echo "  ]," >> "$total_config"
 echo "  \"outbounds\": [" >> "$total_config"
 
-for ((i=1; i<=num_inbounds; i++)); do
+for ((i=1; i<=num_nodes; i++)); do
     read -p "请输入第 $i 个落地 SOCKS5 地址: " outbound_address
+    outbound_addresses[$i]="$outbound_address"
     read -p "请输入第 $i 个落地 SOCKS5 端口: " socks5_port
     read -p "请输入第 $i 个落地 SOCKS5 用户名: " socks5_username
     read -p "请输入第 $i 个落地 SOCKS5 密码: " socks5_password
@@ -102,18 +107,38 @@ for ((i=1; i<=num_inbounds; i++)); do
                     ]
                 }
             ]
-        }
-    }$(if [[ $i -lt $num_inbounds ]]; then echo ","; fi)
+        },
+        "tag": "outbound$i"
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
 EOF
-
-    echo -e "${yellow}节点 $i 对应的落地 SOCKS5 代理信息:${none}"
-    echo -e "${yellow}SOCKS5 地址: $outbound_address${none}"
-    echo -e "${yellow}SOCKS5 端口: $socks5_port${none}"
 done
 
-echo "  ]" >> "$total_config"
+echo "  ]," >> "$total_config"
+
+# 添加路由规则
+echo "  \"routing\": {" >> "$total_config"
+echo "    \"rules\": [" >> "$total_config"
+for ((i=1; i<=num_nodes; i++)); do
+    cat >> "$total_config" << EOF
+    {
+        "type": "field",
+        "inboundTag": ["inbound$i"],
+        "outboundTag": "outbound$i"
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
+EOF
+done
+echo "    ]" >> "$total_config"
+echo "  }" >> "$total_config"
+
 echo "}" >> "$total_config"
 
-if [[ $num_inbounds -gt 0 ]]; then
+if [[ $num_nodes -gt 0 ]]; then
     systemctl restart xray
+    echo -e "${green}启动成功！节点配置文件路径为：${config_dir}${none}"
+
+    echo -e "\n${yellow}节点链接和对应的落地代理信息:${none}"
+    for ((i=1; i<=num_nodes; i++)); do
+        echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
+        echo -e "${yellow}节点 $i 对应的落地代理地址:${none} ${outbound_addresses[$i]}"
+    done
 fi
