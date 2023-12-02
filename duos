@@ -154,9 +154,9 @@ if [[ $num_nodes -gt 0 ]]; then
     systemctl restart xray
     echo -e "${green}启动成功！节点配置文件路径为：${config_dir}${none}"
 
-    echo -e "\n${yellow}节点链接和对应的落地代理信息:${none}"
+    echo -e "\n${yellow}（TG交流群：@kexueshangwang8）（此脚本为大漂亮所写）节点链接和对应的落地代理信息:${none}"
     for ((i=1; i<=num_nodes; i++)); do
-        echo -e "${yellow}（TG交流群：@kexueshangwang8）节点 $i 链接:${none} ${vmess_links[$i]}"
-        echo -e "${yellow}（TG交流群：@kexueshangwang8）节点 $i 对应的落地代理地址:${none} ${outbound_addresses[$i]}"
+        echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
+        echo -e "${yellow}节点 $i 对应的落地代理地址:${none} ${outbound_addresses[$i]}"
     done
 fi
