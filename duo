@@ -35,6 +35,9 @@ fi
 config_dir="/usr/local/etc/xray"
 mkdir -p "$config_dir"
 
+# 删除现有的xray配置文件
+rm -f "$config_dir"/*.json
+
 read -p "请输入要添加落地socks5的数量: " num_inbounds
 if ! [[ $num_inbounds =~ ^[0-9]+$ ]]; then
     echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
@@ -69,6 +72,9 @@ for ((i=1; i<=num_inbounds; i++)); do
         }
     }$(if [[ $i -lt $num_inbounds ]]; then echo ","; fi)
 EOF
+
+    vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$i\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
+    echo -e "\n${yellow}节点 $i 链接:${none} $vmess_link"
 done
 
 echo "  ]," >> "$total_config"
@@ -99,6 +105,10 @@ for ((i=1; i<=num_inbounds; i++)); do
         }
     }$(if [[ $i -lt $num_inbounds ]]; then echo ","; fi)
 EOF
+
+    echo -e "${yellow}节点 $i 对应的落地 SOCKS5 代理信息:${none}"
+    echo -e "${yellow}SOCKS5 地址: $outbound_address${none}"
+    echo -e "${yellow}SOCKS5 端口: $socks5_port${none}"
 done
 
 echo "  ]" >> "$total_config"
