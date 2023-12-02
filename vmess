@@ -6,6 +6,15 @@ yellow='\e[33m'
 green='\e[92m'
 none='\e[0m'
 
+# Get local IPv4 address
+local_ip=$(curl -s http://api64.ipify.org)
+
+# Check if local_ip is a valid IPv4 address
+if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "无法获取本机IPv4地址，请手动输入."
+    read -p "请输入服务器的IPv4地址: " local_ip
+fi
+
 # Check if running as root
 [[ $EUID != 0 ]] && {
     echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}\n" && exit 1
@@ -67,15 +76,6 @@ else
     # Parse user input for socks5 address and port
     socks5_address=$(echo "$socks5_input" | cut -d ':' -f 1)
     socks5_port=$(echo "$socks5_input" | cut -d ':' -f 2)
-    
-    # Get local IPv4 address
-    local_ip=$(curl -s http://api64.ipify.org)
-
-    # Check if local_ip is a valid IPv4 address
-    if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "无法获取本机IPv4地址，请手动输入."
-        read -p "请输入服务器的IPv4地址: " local_ip
-    fi
     
     # Generate xray configuration file with socks5 proxy
     cat << EOF > /usr/local/etc/xray/config.json
