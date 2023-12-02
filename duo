@@ -36,6 +36,9 @@ fi
 # Prompt user for the number of inbound nodes
 read -p "请输入要添加的入站节点数量: " num_inbounds
 
+# Create an array to store outbound configurations
+declare -a outbounds
+
 # Generate random vmess id for each inbound node
 for ((i=1; i<=num_inbounds; i++)); do
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
@@ -52,7 +55,7 @@ for ((i=1; i<=num_inbounds; i++)); do
 {
     "inbounds": [
         {
-            "listen": "0.0.0.0",
+            "listen": "127.0.0.1",
             "port": $vmess_port,
             "protocol": "vmess",
             "settings": {
@@ -93,13 +96,23 @@ for ((i=1; i<=num_inbounds; i++)); do
 }
 EOF
 
-    # Display corresponding outbound information
-    echo -e "\n${yellow}入站节点 $i 连接信息:${none}"
+    # Store outbound configuration
+    outbounds+=(
+        "服务器地址: $socks5_address"
+        "服务器端口: $socks5_port"
+        "用户名: $socks5_username"
+        "密码: $socks5_password"
+    )
+
+    # Display connection information for each inbound node
     vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
+    echo -e "\n${yellow}入站节点 $i 连接信息:${none}"
     echo -e "${yellow}$vmess_info${none}\n"
 
+    # Display corresponding outbound information
     echo -e "对应的出站 SOCKS5 代理信息:"
-    echo -e "服务器地址: $socks5_address"
+    echo -e "${outbounds[@]}"
+    echo -e "\n"
 done
 
 # Restart xray
