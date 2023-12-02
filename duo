@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# Define colors
+red='\e[31m'
+yellow='\e[33m'
+green='\e[92m'
+none='\e[0m'
+
+# Check if running as root
+[[ $EUID != 0 ]] && {
+    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}\n" && exit 1
+}
+
+# Check if xray is already installed
+if type xray &>/dev/null; then
+    echo "检测到 xray 已安装，继续执行后续步骤."
+else
+    # Install xray
+    echo "正在安装 xray..."
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
+
+    # Check if xray installation is successful
+    if ! type xray &>/dev/null; then
+        echo -e "\n${red}错误!${none} xray 安装失败，请检查安装脚本是否正常运行.\n" && exit 1
+    fi
+fi
+
+# Prompt user for the number of inbound nodes
+read -p "请输入要添加的入站节点数量: " num_inbounds
+
+# Generate random vmess port and id for each inbound node
+for ((i=1; i<=num_inbounds; i++)); do
+    vmess_port=$(shuf -i 10000-65535 -n 1)
+    vmess_id=$(cat /proc/sys/kernel/random/uuid)
+
+    # Prompt user for socks5 proxy information for each inbound node
+    read -p "请输入第 $i 个入站节点的落地 SOCKS5 地址: " socks5_address
+    read -p "请输入第 $i 个入站节点的落地 SOCKS5 端口: " socks5_port
+    read -p "请输入第 $i 个入站节点的落地 SOCKS5 用户名: " socks5_username
+    read -p "请输入第 $i 个入站节点的落地 SOCKS5 密码: " socks5_password
+
+    # Generate xray configuration file for each inbound node
+    cat << EOF > "/usr/local/etc/xray/config_inbound_$i.json"
+{
+    "inbounds": [
+        {
+            "listen": "0.0.0.0",
+            "port": $vmess_port,
+            "protocol": "vmess",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$vmess_id"
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "ws",
+                "security": "none",
+                "wsSettings": {
+                    "path": "/dockerlnmp"
+                }
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "socks",
+            "settings": {
+                "servers": [
+                    {
+                        "address": "$socks5_address",
+                        "port": $socks5_port,
+                        "users": [
+                            {
+                                "user": "$socks5_username",
+                                "pass": "$socks5_password"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}
+EOF
+done
+
+# Restart xray
+systemctl restart xray
+
+# Display connection information for each inbound node
+for ((i=1; i<=num_inbounds; i++)); do
+    vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
+    echo -e "\n${yellow}入站节点 $i 连接信息:${none}"
+    echo -e "${yellow}$vmess_info${none}\n"
+
+    # Display corresponding outbound information
+    echo -e "对应的出站 SOCKS5 代理信息:"
+    echo -e "服务器地址: $socks5_address"
+done
