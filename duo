@@ -116,7 +116,7 @@ done
 # Restart xray with all configurations
 num_configs=$(ls "$config_dir"/*.json 2>/dev/null | wc -l)
 if [[ $num_configs -gt 0 ]]; then
-    echo -e "\n${yellow}已生成并启动 $num_configs 个节点配置文件，路径为/usr/local/etc/xray/nodes:${none}"
+    echo -e "\n${yellow}（听风脚本）已生成并启动 $num_configs 个节点配置文件，路径为/usr/local/etc/xray/nodes:${none}"
     ls "$config_dir"/*.json
     for config in "$config_dir"/*.json; do
         xray -config "$config" &
