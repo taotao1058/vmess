@@ -46,6 +46,9 @@ rm -f "$config_dir/config.json"
 read -p "请输入要添加落地socks5的数量: " num_inbounds
 
 # Generate xray configuration file for each inbound node
+total_config="$config_dir/config.json"
+echo "[" > "$total_config"  # Start of JSON array
+
 for ((i=1; i<=num_inbounds; i++)); do
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
@@ -104,6 +107,11 @@ for ((i=1; i<=num_inbounds; i++)); do
 }
 EOF
 
+    # Append the individual config to the total config
+    cat "$config_file" >> "$total_config"
+    # Add a comma to separate individual configs (except for the last one)
+    [[ $i -lt $num_inbounds ]] && echo "," >> "$total_config"
+
     # Display connection information for each inbound node
     vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
     echo -e "\n${yellow}节点 $i 链接:${none}"
@@ -115,13 +123,11 @@ EOF
     echo -e "${yellow}SOCKS5 端口: $socks5_port${none}"
 done
 
+echo "]" >> "$total_config"  # End of JSON array
+
 # Restart xray with all configurations
-num_configs=$(ls "$config_dir"/*.json 2>/dev/null | wc -l)
-if [[ $num_configs -gt 0 ]]; then
-    echo -e "\n${green}（听风脚本）已生成 $num_configs 个节点配置文件，正在启动。。。配置文件路径为/usr/local/etc/xray${none}"
+if [[ $num_inbounds -gt 0 ]]; then
+    echo -e "\n${green}（听风脚本）已生成 $num_inbounds 个节点配置文件，正在启动。。。配置文件路径为/usr/local/etc/xray${none}"
     ls "$config_dir"/*.json
-    for config in "$config_dir"/*.json; do
-        xray run -c "$config" &
-    done
-    wait
+    xray run -c "$total_config" &
 fi
