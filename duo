@@ -43,13 +43,20 @@ if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
     echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
 fi
 
-# 检查端口是否被占用并强制释放端口
+# 检查端口是否被占用并询问是否释放端口
 free_port() {
     local port=$1
     local pid=$(lsof -t -i:$port -sTCP:LISTEN)
     if [ ! -z "$pid" ]; then
-        echo -e "${yellow}警告: 端口 $port 已被进程 $pid 占用, 正在尝试释放...${none}"
-        kill -9 $pid
+        echo -e "${yellow}警告: 端口 $port 已被进程 $pid 占用.${none}"
+        read -p "是否强制释放端口? [Y/N]: " confirm
+        if [[ $confirm == "Y" || $confirm == "y" ]]; then
+            kill -9 $pid
+            echo -e "${green}端口 $port 已释放.${none}"
+        else
+            echo -e "${red}已停止运行。${none}"
+            exit 1
+        fi
     fi
 }
 
