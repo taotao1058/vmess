@@ -104,7 +104,7 @@ EOF
 
     # Display connection information for each inbound node
     vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
-    echo -e "\n${yellow}入站节点 $i 连接信息:${none}"
+    echo -e "\n${yellow}节点 $i 链接:${none}"
     echo -e "${yellow}$vmess_info${none}\n"
 
     # Display corresponding outbound information
