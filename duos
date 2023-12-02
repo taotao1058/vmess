@@ -10,7 +10,7 @@ if ! type curl &>/dev/null; then
 fi
 
 [[ $EUID != 0 ]] && {
-    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请输入sudo -i后再运行\n" && exit 1
+    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
 }
 
 if type xray &>/dev/null; then
