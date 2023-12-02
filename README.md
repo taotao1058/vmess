@@ -9,7 +9,7 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/vmes
 
 
 ---
-###  自用静态格式
+###  自用静态格式（vmess+ws前置）
 
 ```
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/ziyong && bash ziyong
