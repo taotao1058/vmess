@@ -57,7 +57,7 @@ for ((i=1; i<=num_inbounds; i++)); do
     config_file="$config_dir/config_inbound_$i.json"
 
     # Generate xray configuration file for each inbound node
-    cat << EOF > "$config_file"
+    cat > "$config_file" << EOF
 {
     "inbounds": [
         {
