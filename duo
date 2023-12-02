@@ -93,12 +93,11 @@ for ((i=1; i<=num_inbounds; i++)); do
 }
 EOF
 
-    # Display connection information for each inbound node
-    vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
+    # Display corresponding outbound information
     echo -e "\n${yellow}入站节点 $i 连接信息:${none}"
+    vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
     echo -e "${yellow}$vmess_info${none}\n"
 
-    # Display corresponding outbound information
     echo -e "对应的出站 SOCKS5 代理信息:"
     echo -e "服务器地址: $socks5_address"
 done
