@@ -35,7 +35,7 @@ if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 # Create a directory to store xray configurations
-config_dir="/usr/local/etc/xray/nodes"
+config_dir="/usr/local/etc/xray"
 mkdir -p "$config_dir"
 
 # Remove existing xray configuration files
@@ -117,6 +117,6 @@ done
 # Restart xray with all configurations
 num_configs=$(ls "$config_dir"/*.json 2>/dev/null | wc -l)
 if [[ $num_configs -gt 0 ]]; then
-    echo -e "\n${green}（听风脚本）已生成 $num_configs 个节点配置文件，正在启动。。。配置文件路径为/usr/local/etc/xray/nodes${none}"
-    xray run "/usr/local/etc/xray/nodes"/*.json &
+    echo -e "\n${green}（听风脚本）已生成 $num_configs 个节点配置文件，正在启动。。。配置文件路径为/usr/local/etc/xray${none}"
+    xray run "/usr/local/etc/xray"/*.json &
 fi
