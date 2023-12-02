@@ -35,12 +35,4 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duo 
 
 
 
----
 
-###  只需输入地址和端口    可直连
-
-```
-wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/vmess && bash vmess
-```
-
----
