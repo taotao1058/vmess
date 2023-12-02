@@ -37,25 +37,39 @@ read -p "请输入落地 SOCKS5 地址和端口 (格式: 地址:端口)，直接
 
 if [ -z "$socks5_input" ]; then
     # Default to direct mode
-    socks5_address="127.0.0.1"
-    socks5_port="9999"
+    # Remove the outbounds section
+    cat << EOF > /usr/local/etc/xray/config.json
+{
+    "inbounds": [
+        {
+            "listen": "0.0.0.0",
+            "port": $vmess_port,
+            "protocol": "vmess",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$vmess_id"
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "ws",
+                "security": "none",
+                "wsSettings": {
+                    "path": "/dockerlnmp"
+                }
+            }
+        }
+    ]
+}
+EOF
 else
     # Parse user input for socks5 address and port
     socks5_address=$(echo "$socks5_input" | cut -d ':' -f 1)
     socks5_port=$(echo "$socks5_input" | cut -d ':' -f 2)
-fi
-
-# Get local IPv4 address
-local_ip=$(curl -s http://api64.ipify.org)
-
-# Check if local_ip is a valid IPv4 address
-if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "无法获取本机IPv4地址，请手动输入."
-    read -p "请输入服务器的IPv4地址: " local_ip
-fi
-
-# Generate xray configuration file without username and password for socks5
-cat << EOF > /usr/local/etc/xray/config.json
+    
+    # Generate xray configuration file with socks5 proxy
+    cat << EOF > /usr/local/etc/xray/config.json
 {
     "inbounds": [
         {
@@ -93,6 +107,7 @@ cat << EOF > /usr/local/etc/xray/config.json
     ]
 }
 EOF
+fi
 
 # Restart xray
 systemctl restart xray
