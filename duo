@@ -36,10 +36,11 @@ fi
 # Prompt user for the number of inbound nodes
 read -p "请输入要添加的入站节点数量: " num_inbounds
 
-# Create an array to store outbound configurations
-declare -a outbounds
+# Create a directory to store xray configurations
+config_dir="/usr/local/etc/xray/nodes"
+mkdir -p "$config_dir"
 
-# Generate random vmess id for each inbound node
+# Generate xray configuration file for each inbound node
 for ((i=1; i<=num_inbounds; i++)); do
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
@@ -49,9 +50,11 @@ for ((i=1; i<=num_inbounds; i++)); do
     read -p "请输入第 $i 个入站节点的落地 SOCKS5 用户名: " socks5_username
     read -p "请输入第 $i 个入站节点的落地 SOCKS5 密码: " socks5_password
 
-    # Generate xray configuration file for each inbound node
     vmess_port=$((10000 + i))
-    cat << EOF > "/usr/local/etc/xray/config_inbound_$i.json"
+    config_file="$config_dir/config_inbound_$i.json"
+
+    # Generate xray configuration file for each inbound node
+    cat << EOF > "$config_file"
 {
     "inbounds": [
         {
@@ -96,14 +99,6 @@ for ((i=1; i<=num_inbounds; i++)); do
 }
 EOF
 
-    # Store outbound configuration
-    outbounds+=(
-        "服务器地址: $socks5_address"
-        "服务器端口: $socks5_port"
-        "用户名: $socks5_username"
-        "密码: $socks5_password"
-    )
-
     # Display connection information for each inbound node
     vmess_info="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"vmess\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
     echo -e "\n${yellow}入站节点 $i 连接信息:${none}"
@@ -111,9 +106,15 @@ EOF
 
     # Display corresponding outbound information
     echo -e "对应的出站 SOCKS5 代理信息:"
-    echo -e "${outbounds[@]}"
-    echo -e "\n"
+    echo -e "服务器地址: $socks5_address"
+    echo -e "服务器端口: $socks5_port"
+    echo -e "用户名: $socks5_username"
+    echo -e "密码: $socks5_password\n"
 done
 
-# Restart xray
-systemctl restart xray
+# Restart xray with all configurations
+for config in "$config_dir"/*.json; do
+    xray -config "$config" &
+done
+
+echo -e "\n${yellow}所有入站节点已启动.${none}\n"
