@@ -39,7 +39,7 @@ config_dir="/usr/local/etc/xray"
 mkdir -p "$config_dir"
 
 # Remove existing xray configuration files
-rm -f "$config_dir/config*.json"
+rm -f "$config_dir/*.json"
 
 # Prompt user for the number of inbound nodes
 read -p "请输入要添加落地socks5的数量: " num_inbounds
