@@ -20,7 +20,7 @@ install_curl() {
 # 自动分配一个未被占用的端口
 free_port() {
     local port="$1"
-    while [[ "$(netstat -tuln | grep ":$port")" != "" ]]; do
+    while [[ "$(ss -tuln | grep ":$port")" != "" ]]; do
         port=$((port + 1))
     done
     echo "$port"
@@ -144,7 +144,7 @@ done
 echo "  ]," >> "$total_config"
 
 # 添加路由规则
-echo "  \"routing": {" >> "$total_config"
+echo "  \"routing\": {" >> "$total_config"
 echo "    \"rules\": [" >> "$total_config"
 for ((i=1; i<=num_nodes+1; i++)); do
     cat >> "$total_config" << EOF
