@@ -17,6 +17,18 @@ install_curl() {
     fi
 }
 
+free_port() {
+    port="$1"
+    while true; do
+        if [[ $(netstat -tuln | grep ":$port") ]]; then
+            port=$((port + 1))
+        else
+            echo "$port"
+            break
+        fi
+    done
+}
+
 if ! type curl &>/dev/null; then
     echo -e "\n${red}错误!${none} 未找到 ${yellow}curl.${none} 正在安装...\n"
     install_curl
@@ -66,9 +78,7 @@ declare -A vmess_links
 declare -A outbound_addresses
 
 for ((i=1; i<=num_nodes; i++)); do
-    vmess_port=$((10000 + i))
-    free_port $vmess_port
-
+    vmess_port=$(free_port 10000)
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
     cat >> "$total_config" << EOF
@@ -132,7 +142,7 @@ done
 echo "  ]," >> "$total_config"
 
 # 添加路由规则
-echo "  \"routing": {" >> "$total_config"
+echo "  \"routing\": {" >> "$total_config"
 echo "    \"rules\": [" >> "$total_config"
 for ((i=1; i<=num_nodes; i++)); do
     cat >> "$total_config" << EOF
@@ -158,3 +168,45 @@ if [[ $num_nodes -gt 0 ]]; then
         echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
     done
 fi
+
+# 添加节点查询和删除的菜单
+while true; do
+    echo -e "\n${green}菜单:${none}"
+    echo "1. 部署新节点(保留原有节点)"
+    echo "2. 查询所有的节点链接"
+    echo "3. 删除节点"
+    echo "4. 退出"
+
+    read -p "请输入菜单选项: " choice
+    case $choice in
+        1)
+            read -p "请输入需要配置的节点数量: " num_nodes
+            # 继续执行节点部署的逻辑，这部分可以根据用户选择是否保留配置来决定
+            ;;
+        2)
+            # 查询所有节点链接的逻辑，可以输出已配置节点的链接
+            echo -e "\n${yellow}节点链接和对应的出站代理信息:${none}"
+            for ((i=1; i<=num_nodes; i++)); do
+                echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
+                echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
+            done
+            ;;
+        3)
+            # 删除节点的逻辑，可以根据用户选择删除指定节点的配置文件
+            read -p "请输入要删除的节点编号: " node_number
+            if [[ $node_number -ge 1 && $node_number -le $num_nodes ]]; then
+                rm -f "$config_dir"/inbound"$node_number"_*.json
+                rm -f "$config_dir"/outbound"$node_number"_*.json
+                echo "节点 $node_number 已删除。"
+            else
+                echo "无效的节点编号。"
+            fi
+            ;;
+        4)
+            exit 0
+            ;;
+        *)
+            echo "无效的选项，请重新选择。"
+            ;;
+    esac
+done
