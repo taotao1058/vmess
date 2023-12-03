@@ -51,27 +51,20 @@ mkdir -p "$config_dir"
 # 用户是否保留之前的入站和出站配置
 read -p "是否保留之前的入站和出站配置？ [Y/N]: " keep_config
 
-# 初始化节点数量
-num_nodes=0
-
-if [[ $keep_config == "N" || $keep_config == "n" ]]; then
-    # 删除现有的xray配置文件
-    rm -f "$config_dir"/*.json
-else
-    # 获取已有节点数量
-    for f in "$config_dir"/*.json; do
-        if [[ $f == *"_inbound_"* ]]; then
-            num_nodes=$((num_nodes + 1))
-        fi
-    done
-fi
-
 total_config="$config_dir/config.json"
 echo "{" > "$total_config"
 echo "  \"inbounds\": [" >> "$total_config"
 
 declare -A vmess_links
 declare -A outbound_addresses
+
+# 获取已有节点数量
+num_nodes=0
+for f in "$config_dir"/*.json; do
+    if [[ $f == *"_inbound_"* ]]; then
+        num_nodes=$((num_nodes + 1))
+    fi
+done
 
 for ((i=1; i<=num_nodes+1; i++)); do
     vmess_port=$((10000 + i))
