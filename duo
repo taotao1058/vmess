@@ -17,15 +17,6 @@ install_curl() {
     fi
 }
 
-# 自动分配一个未被占用的端口
-free_port() {
-    local port="$1"
-    while [[ "$(ss -tuln | grep ":$port")" != "" ]]; do
-        port=$((port + 1))
-    done
-    echo "$port"
-}
-
 if ! type curl &>/dev/null; then
     echo -e "\n${red}错误!${none} 未找到 ${yellow}curl.${none} 正在安装...\n"
     install_curl
@@ -54,11 +45,18 @@ if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     fi
 fi
 
+# 添加节点数量的选择逻辑
+read -p "请输入需要配置的节点数量: " num_nodes
+
 config_dir="/usr/local/etc/xray"
 mkdir -p "$config_dir"
 
 # 用户是否保留之前的入站和出站配置
 read -p "是否保留之前的入站和出站配置？ [Y/N]: " keep_config
+if [[ $keep_config == "N" || $keep_config == "n" ]]; then
+    # 删除现有的xray配置文件
+    rm -f "$config_dir"/*.json
+fi
 
 total_config="$config_dir/config.json"
 echo "{" > "$total_config"
@@ -67,17 +65,9 @@ echo "  \"inbounds\": [" >> "$total_config"
 declare -A vmess_links
 declare -A outbound_addresses
 
-# 获取已有节点数量
-num_nodes=0
-for f in "$config_dir"/*.json; do
-    if [[ $f == *"_inbound_"* ]]; then
-        num_nodes=$((num_nodes + 1))
-    fi
-done
-
-for ((i=1; i<=num_nodes+1; i++)); do
+for ((i=1; i<=num_nodes; i++)); do
     vmess_port=$((10000 + i))
-    vmess_port=$(free_port $vmess_port)
+    free_port $vmess_port
 
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
@@ -101,7 +91,7 @@ for ((i=1; i<=num_nodes+1; i++)); do
             }
         },
         "tag": "inbound$i"
-    }$(if [[ $i -lt num_nodes+1 ]]; then echo ","; fi)
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
 EOF
 
     vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$i\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
@@ -111,48 +101,46 @@ done
 echo "  ]," >> "$total_config"
 echo "  \"outbounds\": [" >> "$total_config"
 
-for ((i=1; i<=num_nodes+1; i++)); do
-    if [[ $i -eq num_nodes+1 || $keep_config == "N" || $keep_config == "n" ]]; then
-        echo "配置第 $i 个出站代理 (节点$i)"
-        read -p "请输入出站sk5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
+for ((i=1; i<=num_nodes; i++)); do
+    echo "配置第 $i 个出站代理 (节点$i)"
+    read -p "请输入出站sk5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
 
-        outbound_addresses[$i]="$addr:$port"
+    outbound_addresses[$i]="$addr:$port"
 
-        cat >> "$total_config" << EOF
-        {
-            "protocol": "socks",
-            "settings": {
-                "servers": [
-                    {
-                        "address": "$addr",
-                        "port": $port,
-                        "users": [
-                            {
-                                "user": "$user",
-                                "pass": "$pass"
-                            }
-                        ]
-                    }
-                ]
-            },
-            "tag": "outbound$i"
-        }$(if [[ $i -lt num_nodes+1 ]]; then echo ","; fi)
+    cat >> "$total_config" << EOF
+    {
+        "protocol": "socks",
+        "settings": {
+            "servers": [
+                {
+                    "address": "$addr",
+                    "port": $port,
+                    "users": [
+                        {
+                            "user": "$user",
+                            "pass": "$pass"
+                        }
+                    ]
+                }
+            ]
+        },
+        "tag": "outbound$i"
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
 EOF
-    fi
 done
 
 echo "  ]," >> "$total_config"
 
 # 添加路由规则
-echo "  \"routing\": {" >> "$total_config"
+echo "  \"routing": {" >> "$total_config"
 echo "    \"rules\": [" >> "$total_config"
-for ((i=1; i<=num_nodes+1; i++)); do
+for ((i=1; i<=num_nodes; i++)); do
     cat >> "$total_config" << EOF
     {
         "type": "field",
         "inboundTag": ["inbound$i"],
         "outboundTag": "outbound$i"
-    }$(if [[ $i -lt num_nodes+1 ]]; then echo ","; fi)
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
 EOF
 done
 echo "    ]" >> "$total_config"
@@ -160,11 +148,13 @@ echo "  }" >> "$total_config"
 
 echo "}" >> "$total_config"
 
-systemctl restart xray
-echo -e "${green}启动成功！节点配置文件路径为：${config_dir}${none}"
+if [[ $num_nodes -gt 0 ]]; then
+    systemctl restart xray
+    echo -e "${green}启动成功！节点配置文件路径为：${config_dir}${none}"
 
-echo -e "\n${yellow}（TG交流群：@kexueshangwang8）（此脚本为大漂亮所写）节点链接和对应的出站代理信息:${none}"
-for ((i=1; i<=num_nodes+1; i++)); do
-    echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
-    echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
-done
+    echo -e "\n${yellow}（TG交流群：@kexueshangwang8）（此脚本为大漂亮所写）节点链接和对应的出站代理信息:${none}"
+    for ((i=1; i<=num_nodes; i++)); do
+        echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
+        echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
+    done
+fi
