@@ -17,15 +17,6 @@ install_curl() {
     fi
 }
 
-free_port() {
-    local port="$1"
-    while netstat -tuln | grep -q ":$port "; do
-        port=$((port + 1))
-    done
-    echo "$port"
-}
-
-# 检查是否安装了curl，如果没有安装则自动安装
 if ! type curl &>/dev/null; then
     echo -e "\n${red}错误!${none} 未找到 ${yellow}curl.${none} 正在安装...\n"
     install_curl
@@ -59,9 +50,20 @@ mkdir -p "$config_dir"
 
 # 用户是否保留之前的入站和出站配置
 read -p "是否保留之前的入站和出站配置？ [Y/N]: " keep_config
+
+# 初始化节点数量
+num_nodes=0
+
 if [[ $keep_config == "N" || $keep_config == "n" ]]; then
     # 删除现有的xray配置文件
     rm -f "$config_dir"/*.json
+else
+    # 获取已有节点数量
+    for f in "$config_dir"/*.json; do
+        if [[ $f == *"_inbound_"* ]]; then
+            num_nodes=$((num_nodes + 1))
+        fi
+    done
 fi
 
 total_config="$config_dir/config.json"
@@ -71,17 +73,9 @@ echo "  \"inbounds\": [" >> "$total_config"
 declare -A vmess_links
 declare -A outbound_addresses
 
-# 获取已有节点数量
-num_nodes=0
-for f in "$config_dir"/*.json; do
-    if [[ $f == *"_inbound_"* ]]; then
-        num_nodes=$((num_nodes + 1))
-    fi
-done
-
-for ((i=1; i<=num_nodes; i++)); do
+for ((i=1; i<=num_nodes+1; i++)); do
     vmess_port=$((10000 + i))
-    vmess_port=$(free_port $vmess_port)
+    free_port $vmess_port
 
     vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
@@ -105,7 +99,7 @@ for ((i=1; i<=num_nodes; i++)); do
             }
         },
         "tag": "inbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
+    }$(if [[ $i -lt num_nodes+1 ]]; then echo ","; fi)
 EOF
 
     vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$i\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
@@ -115,7 +109,7 @@ done
 echo "  ]," >> "$total_config"
 echo "  \"outbounds\": [" >> "$total_config"
 
-for ((i=1; i<=num_nodes; i++)); do
+for ((i=1; i<=num_nodes+1; i++)); do
     echo "配置第 $i 个出站代理 (节点$i)"
     read -p "请输入出站sk5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
 
@@ -139,7 +133,7 @@ for ((i=1; i<=num_nodes; i++)); do
             ]
         },
         "tag": "outbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
+    }$(if [[ $i -lt num_nodes+1 ]]; then echo ","; fi)
 EOF
 done
 
@@ -148,13 +142,13 @@ echo "  ]," >> "$total_config"
 # 添加路由规则
 echo "  \"routing\": {" >> "$total_config"
 echo "    \"rules\": [" >> "$total_config"
-for ((i=1; i<=num_nodes; i++)); do
+for ((i=1; i<=num_nodes+1; i++)); do
     cat >> "$total_config" << EOF
     {
         "type": "field",
         "inboundTag": ["inbound$i"],
         "outboundTag": "outbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
+    }$(if [[ $i -lt num_nodes+1 ]]; then echo ","; fi)
 EOF
 done
 echo "    ]" >> "$total_config"
@@ -167,7 +161,7 @@ if [[ $num_nodes -gt 0 ]]; then
     echo -e "${green}启动成功！节点配置文件路径为：${config_dir}${none}"
 
     echo -e "\n${yellow}（TG交流群：@kexueshangwang8）（此脚本为大漂亮所写）节点链接和对应的出站代理信息:${none}"
-    for ((i=1; i<=num_nodes; i++)); do
+    for ((i=1; i<=num_nodes+1; i++)); do
         echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
         echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
     done
