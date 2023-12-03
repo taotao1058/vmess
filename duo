@@ -5,12 +5,25 @@ yellow='\e[33m'
 green='\e[32m'
 none='\e[0m'
 
+# 自动安装curl
+install_curl() {
+    if [[ -x "$(command -v apt-get)" ]]; then
+        apt-get update
+        apt-get install -y curl
+    elif [[ -x "$(command -v yum)" ]]; then
+        yum install -y curl
+    else
+        echo -e "\n${red}错误!${none} 无法安装 ${yellow}curl.${none} 未知的包管理器.\n" && exit 1
+    fi
+}
+
 if ! type curl &>/dev/null; then
-    echo -e "\n${red}错误!${none} 需要安装 ${yellow}curl.${none}\n" && exit 1
+    echo -e "\n${red}错误!${none} 未找到 ${yellow}curl.${none} 正在安装...\n"
+    install_curl
 fi
 
 [[ $EUID != 0 ]] && {
-    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}\n" && exit 1
+    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
 }
 
 if type xray &>/dev/null; then
@@ -35,30 +48,12 @@ fi
 config_dir="/usr/local/etc/xray"
 mkdir -p "$config_dir"
 
-# 删除现有的xray配置文件
-rm -f "$config_dir"/*.json
-
-read -p "请输入要添加的节点数量: " num_nodes
-if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
-    echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
+# 用户是否保留之前的入站和出站配置
+read -p "是否保留之前的入站和出站配置？ [Y/N]: " keep_config
+if [[ $keep_config == "N" || $keep_config == "n" ]]; then
+    # 删除现有的xray配置文件
+    rm -f "$config_dir"/*.json
 fi
-
-# 检查端口是否被占用并询问是否释放端口
-free_port() {
-    local port=$1
-    local pid=$(lsof -t -i:$port -sTCP:LISTEN)
-    if [ ! -z "$pid" ]; then
-        echo -e "${yellow}警告: 端口 $port 已被进程 $pid 占用.${none}"
-        read -p "是否强制释放端口? [Y/N]: " confirm
-        if [[ $confirm == "Y" || $confirm == "y" ]]; then
-            kill -9 $pid
-            echo -e "${green}端口 $port 已释放.${none}"
-        else
-            echo -e "${red}已停止运行。${none}"
-            exit 1
-        fi
-    fi
-}
 
 total_config="$config_dir/config.json"
 echo "{" > "$total_config"
@@ -66,6 +61,14 @@ echo "  \"inbounds\": [" >> "$total_config"
 
 declare -A vmess_links
 declare -A outbound_addresses
+
+# 获取已有节点数量
+num_nodes=0
+for f in "$config_dir"/*.json; do
+    if [[ $f == *"_inbound_"* ]]; then
+        num_nodes=$((num_nodes + 1))
+    fi
+done
 
 for ((i=1; i<=num_nodes; i++)); do
     vmess_port=$((10000 + i))
@@ -104,11 +107,10 @@ echo "  ]," >> "$total_config"
 echo "  \"outbounds\": [" >> "$total_config"
 
 for ((i=1; i<=num_nodes; i++)); do
-    read -p "请输入第 $i 个落地 SOCKS5 地址: " outbound_address
-    outbound_addresses[$i]="$outbound_address"
-    read -p "请输入第 $i 个落地 SOCKS5 端口: " socks5_port
-    read -p "请输入第 $i 个落地 SOCKS5 用户名: " socks5_username
-    read -p "请输入第 $i 个落地 SOCKS5 密码: " socks5_password
+    echo "配置第 $i 个出站代理 (节点$i)"
+    read -p "请输入出站sk5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
+
+    outbound_addresses[$i]="$addr:$port"
 
     cat >> "$total_config" << EOF
     {
@@ -116,12 +118,12 @@ for ((i=1; i<=num_nodes; i++)); do
         "settings": {
             "servers": [
                 {
-                    "address": "$outbound_address",
-                    "port": $socks5_port,
+                    "address": "$addr",
+                    "port": $port,
                     "users": [
                         {
-                            "user": "$socks5_username",
-                            "pass": "$socks5_password"
+                            "user": "$user",
+                            "pass": "$pass"
                         }
                     ]
                 }
@@ -155,9 +157,9 @@ if [[ $num_nodes -gt 0 ]]; then
     systemctl restart xray
     echo -e "${green}启动成功！节点配置文件路径为：${config_dir}${none}"
 
-    echo -e "\n${yellow}节点链接和对应的落地代理信息:${none}"
+    echo -e "\n${yellow}（TG交流群：@kexueshangwang8）（此脚本为大漂亮所写）节点链接和对应的出站代理信息:${none}"
     for ((i=1; i<=num_nodes; i++)); do
         echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
-        echo -e "${yellow}节点 $i 对应的落地代理地址:${none} ${outbound_addresses[$i]}"
+        echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
     done
 fi
