@@ -29,6 +29,7 @@ free_port() {
     done
 }
 
+# 检查是否安装了curl
 if ! type curl &>/dev/null; then
     echo -e "\n${red}错误!${none} 未找到 ${yellow}curl.${none} 正在安装...\n"
     install_curl
@@ -38,6 +39,7 @@ fi
     echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
 }
 
+# 检查是否安装xray
 if type xray &>/dev/null; then
     echo "检测到 xray 已安装，继续执行后续步骤."
 else
