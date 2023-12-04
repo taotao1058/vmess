@@ -31,9 +31,7 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/SS &
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duo && bash duo
 ```
 
-```
-wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/guanli && bash guanli
-```
+
 ---
 
 ###  3x-ui安装脚本
