@@ -183,7 +183,9 @@ EOF
             echo -e "\n${yellow}节点链接信息:${none}"
             for i in "${!vmess_links[@]}"; do
                 echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
+                echo -e "${yellow}节点 $i 出站地址:${none} ${outbound_addresses[$i]}"
             done
+            echo -e "\n节点配置文件路径: ${green}${total_config}${none}"
             ;;
         3)
             read -p "请输入要删除的节点端口号: " del_port
