@@ -66,21 +66,21 @@ add_new_nodes() {
         local new_id=$(uuidgen)
 
         # 添加入站配置
-        jq --argjson newInbound "
-        {
-            port: $new_port,
-            protocol: 'vmess',
-            settings: { clients: [{ id: '$new_id' }] },
-            streamSettings: { network: 'ws', security: 'none', wsSettings: { path: '/websocket' } },
-            tag: '$new_tag'
-        }" '.inbounds += [$newInbound]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+        jq --arg port "$new_port" --arg id "$new_id" --arg tag "$new_tag" '
+        .inbounds += [{
+            port: ($port | tonumber),
+            protocol: "vmess",
+            settings: { clients: [{ id: $id }] },
+            streamSettings: { network: "ws", security: "none", wsSettings: { path: "/websocket" } },
+            tag: $tag
+        }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
         # 添加出站配置
-        jq --arg newTag "$new_outbound_tag" --arg newAddr "127.0.0.1" --argjson newPort "$new_port" '
+        jq --arg tag "$new_outbound_tag" --arg addr "127.0.0.1" --arg port "$new_port" '
         .outbounds += [{
             protocol: "socks",
-            settings: { servers: [{ address: $newAddr, port: $newPort }] },
-            tag: $newTag
+            settings: { servers: [{ address: $addr, port: ($port | tonumber) }] },
+            tag: $tag
         }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
         # 添加路由规则
@@ -91,6 +91,7 @@ add_new_nodes() {
 
     echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
 }
+
 
 # 删除节点
 delete_node() {
