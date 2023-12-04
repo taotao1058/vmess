@@ -124,7 +124,7 @@ main_menu() {
         echo -e "\n${green}（此脚本需运行前置脚本之后才能运行）菜单:${none}"
         echo "1. 查看所有节点"
         echo "2. 新增节点配置"
-        echo "3. 删除节点"
+        echo "3. 删除节点（暂时不可用）"
         echo "4. 退出"
         read -p "请输入选项: " choice
 
