@@ -61,8 +61,8 @@ add_new_nodes() {
 
     for ((i=0; i<num_nodes; i++)); do
         local new_port=$((start_port+i))
-        local new_inbound_tag="$new_port"  # 纯数字格式的 tag
-        local new_outbound_tag="$((new_port + 10000))"  # 确保出站 tag 与入站 tag 不冲突，例如增加 10000
+        local new_inbound_tag="inbound$new_port"
+        local new_outbound_tag="outbound$new_port"
         local new_id=$(uuidgen)
 
         # 用户输入出站代理信息
@@ -87,13 +87,9 @@ add_new_nodes() {
             tag: $tag
         }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
-        # 添加路由规则
-        jq --arg inTag "$new_inbound_tag" --arg outTag "$new_outbound_tag" '
-        .routing.rules += [{ type: "field", inboundTag: [$inTag], outboundTag: $outTag }]
-        ' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
-    done
+        echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
+    }
 
-    echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
     systemctl restart xray
     echo -e "${green}Xray 服务已重新启动。${none}"
 }
@@ -104,8 +100,8 @@ delete_node() {
     IFS=' ' read -r -a port_array <<< "$ports"
 
     for port in "${port_array[@]}"; do
-        local inbound_tag="$port"
-        local outbound_tag="$((port + 10000))"  # 根据之前的规则确定出站 tag
+        local inbound_tag="inbound$port"
+        local outbound_tag="outbound$port"
 
         # 删除入站配置
         jq "del(.inbounds[] | select(.tag == \"$inbound_tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
@@ -115,7 +111,7 @@ delete_node() {
         jq "del(.routing.rules[] | select(.inboundTag[] == \"$inbound_tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
 
         echo -e "${green}已删除端口 $port 的节点。${none}"
-    done
+    }
 
     systemctl restart xray
     echo -e "${green}Xray 服务已重新启动，配置更新完毕。${none}"
@@ -138,9 +134,12 @@ main_menu() {
             4) break ;;
             *) echo -e "${red}无效的选项，请重新选择。${none}" ;;
         esac
-    done
+    }
+
+    check_jq_installed
+    local_ip=$(get_local_ip)
+    main_menu
 }
 
-check_jq_installed
-local_ip=$(get_local_ip)
+# 执行主菜单
 main_menu
