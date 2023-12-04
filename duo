@@ -22,15 +22,7 @@ install_tools() {
     fi
 }
 
-# 检查是否为ROOT用户
-[[ $EUID != 0 ]] && {
-    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
-}
-
-# 安装必要工具
-install_tools
-
-# 安装xray
+# 检查并安装xray
 install_xray() {
     if type xray &>/dev/null; then
         echo "检测到 xray 已安装，继续执行后续步骤."
@@ -42,9 +34,6 @@ install_xray() {
         fi
     fi
 }
-install_xray
-
-local_ip=$(get_local_ip)
 
 # 获取本机IP地址
 get_local_ip() {
@@ -58,6 +47,19 @@ get_local_ip() {
     fi
     echo $local_ip
 }
+
+# 检查是否为ROOT用户
+[[ $EUID != 0 ]] && {
+    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
+}
+
+# 安装必要工具
+install_tools
+
+# 安装xray
+install_xray
+
+local_ip=$(get_local_ip)
 
 # 配置文件目录
 config_dir="/usr/local/etc/xray"
@@ -84,11 +86,13 @@ find_free_port() {
 create_node() {
     local node_num=$1
     local vmess_port=$(find_free_port)
-    local outbound_port=$((vmess_port + 1))
 
     local vmess_id=$(cat /proc/sys/kernel/random/uuid)
-    local outbound_user="user$node_num"
-    local outbound_pass="pass$node_num"
+
+    # 为入站节点添加出站配置
+    echo "配置第 $node_num 个出站代理 (节点$node_num)"
+    read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
+    outbound_addresses[$node_num]="$addr:$port"
 
     # 添加新节点到配置文件
     jq --argjson newInbound "
@@ -113,19 +117,19 @@ create_node() {
         tag: 'inbound$node_num'
     }" '.inbounds += [$newInbound]' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
 
-    # 添加对应的出站代理
+    # 为每个入站节点添加相应的出站socks5代理
     jq --argjson newOutbound "
     {
         protocol: 'socks',
         settings: {
             servers: [
                 {
-                    address: '$local_ip',
-                    port: $outbound_port,
+                    address: '$addr',
+                    port: $port,
                     users: [
                         {
-                            user: '$outbound_user',
-                            pass: '$outbound_pass'
+                            user: '$user',
+                            pass: '$pass'
                         }
                     ]
                 }
@@ -136,14 +140,12 @@ create_node() {
 
     local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$node_num\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
     vmess_links[$node_num]="$vmess_link"
-    outbound_addresses[$node_num]="$local_ip:$outbound_port"
 }
 
 # 删除节点
 delete_node() {
     local del_port=$1
     jq --argjson delPort $del_port '.inbounds |= map(select(.port != $delPort))' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
-    jq --argjson delPort $del_port '.outbounds |= map(select(.settings.servers[0].port != $delPort))' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
 }
 
 # 菜单逻辑
