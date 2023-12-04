@@ -98,17 +98,20 @@ add_new_nodes() {
 
 # 删除节点
 delete_node() {
-    read -p "请输入要删除的节点序号: " node_index
-    local actual_index=$((node_index - 1))
-    if ! [[ $actual_index =~ ^[0-9]+$ ]]; then
-        echo -e "${red}错误!${none} 请输入有效的序号。\n"
-        return
-    fi
+    read -p "请输入要删除的节点端口号（多个用空格隔开）: " ports
+    IFS=' ' read -r -a port_array <<< "$ports"
 
-    local tag=$(jq -r ".inbounds[$actual_index].tag" "$config_file")
-    jq "del(.inbounds[$actual_index]) | del(.routing.rules[] | select(.inboundTag == \"$tag\")) | del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
-    
-    echo -e "${green}已删除序号为 $node_index 的节点。${none}"
+    for port in "${port_array[@]}"; do
+        local tag=$(jq -r ".inbounds[] | select(.port == $port) | .tag" "$config_file")
+
+        # 删除入站配置
+        jq "del(.inbounds[] | select(.port == $port))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+        
+        # 删除对应的出站配置和路由规则
+        jq "del(.routing.rules[] | select(.inboundTag == \"$tag\")) | del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+
+        echo -e "${green}已关闭端口 $port 的节点。${none}"
+    done
 }
 
 # 主菜单
