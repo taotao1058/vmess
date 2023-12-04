@@ -48,7 +48,7 @@ show_inbound_configs() {
     done
 }
 
-# 添加新节点
+# 添加节点
 add_new_nodes() {
     read -p "请输入要添加的节点数量: " num_nodes
     if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
@@ -61,8 +61,8 @@ add_new_nodes() {
 
     for ((i=0; i<num_nodes; i++)); do
         local new_port=$((start_port+i))
-        local new_tag="inbound$new_port"
-        local new_outbound_tag="outbound$new_port"
+        local new_inbound_tag="$new_port"  # 纯数字格式的 tag
+        local new_outbound_tag="$((new_port + 10000))"  # 确保出站 tag 与入站 tag 不冲突，例如增加 10000
         local new_id=$(uuidgen)
 
         # 用户输入出站代理信息
@@ -70,7 +70,7 @@ add_new_nodes() {
         read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " outbound_addr outbound_port outbound_user outbound_pass
 
         # 添加入站配置
-        jq --argjson port "$new_port" --arg id "$new_id" --arg tag "$new_tag" '
+        jq --argjson port "$new_port" --arg id "$new_id" --arg tag "$new_inbound_tag" '
         .inbounds += [{
             port: $port,
             protocol: "vmess",
@@ -88,7 +88,7 @@ add_new_nodes() {
         }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
         # 添加路由规则
-        jq --arg inTag "$new_tag" --arg outTag "$new_outbound_tag" '
+        jq --arg inTag "$new_inbound_tag" --arg outTag "$new_outbound_tag" '
         .routing.rules += [{ type: "field", inboundTag: [$inTag], outboundTag: $outTag }]
         ' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
     done
@@ -104,20 +104,15 @@ delete_node() {
     IFS=' ' read -r -a port_array <<< "$ports"
 
     for port in "${port_array[@]}"; do
-        # 直接使用完整路径而非变量
-        local tag=$(jq -r ".inbounds[] | select(.port == $port) | .tag" /usr/local/etc/xray/config.json)
-
-        if [ -z "$tag" ]; then
-            echo -e "${red}端口 $port 没有找到对应的入站配置。${none}"
-            continue
-        fi
+        local inbound_tag="$port"
+        local outbound_tag="$((port + 10000))"  # 根据之前的规则确定出站 tag
 
         # 删除入站配置
-        jq "del(.inbounds[] | select(.port == $port))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
+        jq "del(.inbounds[] | select(.tag == \"$inbound_tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
 
         # 删除对应的出站配置和路由规则
-        jq "del(.outbounds[] | select(.tag == \"$tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
-        jq "del(.routing.rules[] | select(.inboundTag[] == \"$tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
+        jq "del(.outbounds[] | select(.tag == \"$outbound_tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
+        jq "del(.routing.rules[] | select(.inboundTag[] == \"$inbound_tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
 
         echo -e "${green}已删除端口 $port 的节点。${none}"
     done
