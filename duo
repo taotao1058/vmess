@@ -106,16 +106,22 @@ delete_node() {
     for port in "${port_array[@]}"; do
         local tag=$(jq -r ".inbounds[] | select(.port == $port) | .tag" "$config_file")
 
+        if [ -z "$tag" ]; then
+            echo -e "${red}端口 $port 没有找到对应的入站配置。${none}"
+            continue
+        fi
+
         # 删除入站配置
         jq "del(.inbounds[] | select(.port == $port))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
         
         # 删除对应的出站配置和路由规则
         jq "del(.routing.rules[] | select(.inboundTag == \"$tag\")) | del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
-        echo -e "${green}已关闭端口 $port 的节点。${none}"
-        systemctl restart xray
-        echo -e "${green}Xray 服务已重新启动。${none}"
+        echo -e "${green}已关闭并删除端口 $port 的节点及其对应出站和路由配置。${none}"
     done
+
+    systemctl restart xray
+    echo -e "${green}Xray 服务已重新启动。${none}"
 }
 
 # 主菜单
