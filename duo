@@ -5,36 +5,39 @@ yellow='\e[33m'
 green='\e[32m'
 none='\e[0m'
 
-# 检查并安装curl
-if ! type curl &>/dev/null; then
-    echo -e "\n${red}错误!${none} 需要安装 ${yellow}curl.${none}\n" && exit 1
-fi
+# 检查并安装必要的工具
+install_tools() {
+    if ! type curl &>/dev/null; then
+        echo -e "\n${red}错误!${none} 需要安装 ${yellow}curl.${none}\n" && exit 1
+    fi
 
-# 检查并安装lsof
-if ! type lsof &>/dev/null; then
-    echo -e "\n${yellow}安装 ${green}lsof${none} 工具中...\n"
-    apt-get update && apt-get install -y lsof
-fi
+    if ! type lsof &>/dev/null; then
+        echo -e "\n${yellow}安装 ${green}lsof${none} 工具中...\n"
+        apt-get update && apt-get install -y lsof
+    fi
 
-# 检查是否为ROOT用户
-[[ $EUID != 0 ]] && {
-    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
+    if ! type jq &>/dev/null; then
+        echo -e "\n${yellow}安装 ${green}jq${none} 工具中...\n"
+        apt-get update && apt-get install -y jq
+    fi
 }
 
 # 检查并安装xray
-if type xray &>/dev/null; then
-    echo "检测到 xray 已安装，继续执行后续步骤."
-else
-    echo "正在安装 xray..."
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
-    if ! type xray &>/dev/null; then
-        echo -e "\n${red}错误!${none} xray 安装失败，请检查安装脚本是否正常运行.\n" && exit 1
+install_xray() {
+    if type xray &>/dev/null; then
+        echo "检测到 xray 已安装，继续执行后续步骤."
+    else
+        echo "正在安装 xray..."
+        bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
+        if ! type xray &>/dev/null; then
+            echo -e "\n${red}错误!${none} xray 安装失败，请检查安装脚本是否正常运行.\n" && exit 1
+        fi
     fi
-fi
+}
 
 # 获取本机IP地址
 get_local_ip() {
-    local_ip=$(curl -s http://api64.ipify.org)
+    local local_ip=$(curl -s http://api64.ipify.org)
     if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "无法获取本机IPv4地址，请手动输入."
         read -p "请输入本机的IP地址: " local_ip
@@ -44,6 +47,19 @@ get_local_ip() {
     fi
     echo $local_ip
 }
+
+# 检查是否为ROOT用户
+[[ $EUID != 0 ]] && {
+    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
+}
+
+# 安装必要工具
+install_tools
+
+# 安装xray
+install_xray
+
+local_ip=$(get_local_ip)
 
 # 配置文件目录
 config_dir="/usr/local/etc/xray"
@@ -73,28 +89,28 @@ create_node() {
 
     local vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
-    cat >> "$total_config" << EOF
+    # 添加新节点到配置文件
+    jq --argjson newInbound "
     {
-        "listen": "0.0.0.0",
-        "port": $vmess_port,
-        "protocol": "vmess",
-        "settings": {
-            "clients": [
+        listen: '0.0.0.0',
+        port: $vmess_port,
+        protocol: 'vmess',
+        settings: {
+            clients: [
                 {
-                    "id": "$vmess_id"
+                    id: '$vmess_id'
                 }
             ]
         },
-        "streamSettings": {
-            "network": "ws",
-            "security": "none",
-            "wsSettings": {
-                "path": "/dockerlnmp"
+        streamSettings: {
+            network: 'ws',
+            security: 'none',
+            wsSettings: {
+                path: '/dockerlnmp'
             }
         },
-        "tag": "inbound$node_num"
-    }$(if [[ $node_num -lt $num_nodes ]]; then echo ","; fi)
-EOF
+        tag: 'inbound$node_num'
+    }" '.inbounds += [$newInbound]' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
 
     local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$node_num\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
     vmess_links[$node_num]="$vmess_link"
@@ -103,8 +119,7 @@ EOF
 # 删除节点
 delete_node() {
     local del_port=$1
-    # 假设配置文件中每个端口的配置占据一个独立的行
-    sed -i "/\"port\": $del_port/d" "$total_config"
+    jq --argjson delPort $del_port '.inbounds |= map(select(.port != $delPort))' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
 }
 
 # 菜单逻辑
@@ -123,67 +138,22 @@ while true; do
                 echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
             fi
 
-            echo "{" > "$total_config"
-            echo "  \"inbounds\": [" >> "$total_config"
-
             for ((i=1; i<=num_nodes; i++)); do
                 create_node $i
             done
-
-            echo "  ]," >> "$total_config"
-            echo "  \"outbounds\": [" >> "$total_config"
-
-            # 添加出站配置
-            for ((i=1; i<=num_nodes; i++)); do
-                echo "配置第 $i 个出站代理 (节点$i)"
-                read -p "请输入出站sk5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
-                outbound_addresses[$i]="$addr:$port"
-
-                cat >> "$total_config" << EOF
-    {
-        "protocol": "socks",
-        "settings": {
-            "servers": [
-                {
-                    "address": "$addr",
-                    "port": $port,
-                    "users": [
-                        {
-                            "user": "$user",
-                            "pass": "$pass"
-                        }
-                    ]
-                }
-            ]
-        },
-        "tag": "outbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
-EOF
-            done
-
-            echo "  ]," >> "$total_config"
-            echo "  \"routing\": {" >> "$total_config"
-            echo "    \"rules\": [" >> "$total_config"
-            for ((i=1; i<=num_nodes; i++)); do
-                cat >> "$total_config" << EOF
-    {
-        "type": "field",
-        "inboundTag": ["inbound$i"],
-        "outboundTag": "outbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
-EOF
-            done
-            echo "    ]" >> "$total_config"
-            echo "  }" >> "$total_config"
-            echo "}" >> "$total_config"
 
             systemctl restart xray
             ;;
         2)
             echo -e "\n${yellow}节点链接信息:${none}"
-            for i in "${!vmess_links[@]}"; do
-                echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
-                echo -e "${yellow}节点 $i 出站地址:${none} ${outbound_addresses[$i]}"
+            config=$(jq '.' "$total_config")
+            for i in $(jq -r '.inbounds | keys[]' <<< "$config"); do
+                local port=$(jq -r ".inbounds[$i].port" <<< "$config")
+                local tag=$(jq -r ".inbounds[$i].tag" <<< "$config")
+                local vmess_id=$(jq -r ".inbounds[$i].settings.clients[0].id" <<< "$config")
+                local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"$tag\",\"add\":\"$local_ip\",\"port\":$port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
+                echo -e "${yellow}节点 $tag 链接:${none} $vmess_link"
+                echo -e "${yellow}节点 $tag 对应的出站地址:${none} ${outbound_addresses[$tag]}"
             done
             echo -e "\n节点配置文件路径: ${green}${total_config}${none}"
             ;;
