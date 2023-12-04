@@ -86,61 +86,33 @@ find_free_port() {
 create_node() {
     local node_num=$1
     local vmess_port=$(find_free_port)
-
     local vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
     # 为入站节点添加出站配置
     echo "配置第 $node_num 个出站代理 (节点$node_num)"
     read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
-    outbound_addresses[$node_num]="$addr:$port"
 
     # 添加新节点到配置文件
-    jq --argjson newInbound "
-    {
-        listen: '0.0.0.0',
-        port: $vmess_port,
-        protocol: 'vmess',
-        settings: {
-            clients: [
-                {
-                    id: '$vmess_id'
-                }
-            ]
-        },
-        streamSettings: {
-            network: 'ws',
-            security: 'none',
-            wsSettings: {
-                path: '/dockerlnmp'
-            }
-        },
-        tag: 'inbound$node_num'
-    }" '.inbounds += [$newInbound]' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
-
-    # 为每个入站节点添加相应的出站socks5代理
-    jq --argjson newOutbound "
-    {
-        protocol: 'socks',
-        settings: {
-            servers: [
-                {
-                    address: '$addr',
-                    port: $port,
-                    users: [
-                        {
-                            user: '$user',
-                            pass: '$pass'
-                        }
-                    ]
-                }
-            ]
-        },
-        tag: 'outbound$node_num'
-    }" '.outbounds += [$newOutbound]' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
+    jq --arg port "$vmess_port" --arg id "$vmess_id" --arg tag "inbound$node_num" --arg addr "$addr" --argjson port "$port" --arg user "$user" --arg pass "$pass" '
+    .inbounds += [{
+        listen: "0.0.0.0",
+        port: ($port | tonumber),
+        protocol: "vmess",
+        settings: { clients: [{ id: $id }] },
+        streamSettings: { network: "ws", security: "none", wsSettings: { path: "/dockerlnmp" } },
+        tag: $tag
+    }] |
+    .outbounds += [{
+        protocol: "socks",
+        settings: { servers: [{ address: $addr, port: ($port | tonumber), users: [{ user: $user, pass: $pass }] }] },
+        tag: ("outbound" + $tag)
+    }]' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
 
     local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$node_num\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
     vmess_links[$node_num]="$vmess_link"
+    outbound_addresses[$node_num]="$addr:$port"
 }
+
 
 # 删除节点
 delete_node() {
