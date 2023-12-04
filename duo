@@ -31,20 +31,22 @@ get_local_ip() {
     fi
 }
 
-
 # 显示所有入站配置
 show_inbound_configs() {
     local config=$(jq '.' "$config_file")
     echo -e "${green}入站节点配置:${none}"
 
-    for i in $(jq -r '.inbounds | keys[]' <<< "$config"); do
+    local length=$(jq '.inbounds | length' <<< "$config")
+    for ((i = 0; i < length; i++)); do
         local port=$(jq -r ".inbounds[$i].port" <<< "$config")
         local tag=$(jq -r ".inbounds[$i].tag" <<< "$config")
         local outboundTag=$(jq -r ".routing.rules[] | select(.inboundTag == \"$tag\") | .outboundTag" <<< "$config")
         local outboundAddr=$(jq -r ".outbounds[] | select(.tag == \"$outboundTag\") | .settings.servers[0].address" <<< "$config")
         local outboundPort=$(jq -r ".outbounds[] | select(.tag == \"$outboundTag\") | .settings.servers[0].port" <<< "$config")
+        local outboundUser=$(jq -r ".outbounds[] | select(.tag == \"$outboundTag\") | .settings.servers[0].users[0].user" <<< "$config")
+        local outboundPass=$(jq -r ".outbounds[] | select(.tag == \"$outboundTag\") | .settings.servers[0].users[0].pass" <<< "$config")
 
-        echo -e "${yellow}序号: ${i}${none} - 端口: ${port}, 出站地址: ${outboundAddr}:${outboundPort}"
+        echo -e "${yellow}序号: $(($i + 1))${none} - 端口: ${port}, 出站地址: ${outboundAddr}:${outboundPort}, 用户名: ${outboundUser}, 密码: ${outboundPass}"
     done
 }
 
