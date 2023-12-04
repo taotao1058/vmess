@@ -56,7 +56,7 @@ add_new_nodes() {
         return
     fi
 
-    local max_port=$(jq '[.inbounds[].port] | max' "$config_file")
+    local max_port=$(jq '[.inbounds[].port] | max // 10000' "$config_file")
     local start_port=$((max_port+1))
 
     for ((i=0; i<num_nodes; i++)); do
@@ -66,9 +66,9 @@ add_new_nodes() {
         local new_id=$(uuidgen)
 
         # 添加入站配置
-        jq --arg port "$new_port" --arg id "$new_id" --arg tag "$new_tag" '
+        jq --argjson port "$new_port" --arg id "$new_id" --arg tag "$new_tag" '
         .inbounds += [{
-            port: ($port | tonumber),
+            port: $port,
             protocol: "vmess",
             settings: { clients: [{ id: $id }] },
             streamSettings: { network: "ws", security: "none", wsSettings: { path: "/websocket" } },
@@ -76,10 +76,10 @@ add_new_nodes() {
         }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
         # 添加出站配置
-        jq --arg tag "$new_outbound_tag" --arg addr "127.0.0.1" --arg port "$new_port" '
+        jq --arg tag "$new_outbound_tag" --arg addr "127.0.0.1" --argjson port "$new_port" '
         .outbounds += [{
             protocol: "socks",
-            settings: { servers: [{ address: $addr, port: ($port | tonumber) }] },
+            settings: { servers: [{ address: $addr, port: $port }] },
             tag: $tag
         }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
@@ -91,6 +91,7 @@ add_new_nodes() {
 
     echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
 }
+
 
 
 # 删除节点
