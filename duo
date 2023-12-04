@@ -4,172 +4,128 @@ red='\e[31m'
 yellow='\e[33m'
 green='\e[32m'
 none='\e[0m'
+config_file="/usr/local/etc/xray/config.json"
 
-# 检查并安装必要的工具
-install_tools() {
-    if ! type curl &>/dev/null; then
-        echo -e "\n${red}错误!${none} 需要安装 ${yellow}curl.${none}\n" && exit 1
-    fi
-
-    if ! type lsof &>/dev/null; then
-        echo -e "\n${yellow}安装 ${green}lsof${none} 工具中...\n"
-        apt-get update && apt-get install -y lsof
-    fi
-
+# 检查 jq 工具是否安装
+check_jq_installed() {
     if ! type jq &>/dev/null; then
-        echo -e "\n${yellow}安装 ${green}jq${none} 工具中...\n"
+        echo -e "${yellow}正在安装 jq 工具...${none}"
         apt-get update && apt-get install -y jq
     fi
 }
 
-# 检查并安装xray
-install_xray() {
-    if type xray &>/dev/null; then
-        echo "检测到 xray 已安装，继续执行后续步骤."
-    else
-        echo "正在安装 xray..."
-        bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
-        if ! type xray &>/dev/null; then
-            echo -e "\n${red}错误!${none} xray 安装失败，请检查安装脚本是否正常运行.\n" && exit 1
-        fi
-    fi
-}
-
-# 获取本机IP地址
+# 获取本机公网 IP
 get_local_ip() {
-    local local_ip=$(curl -s http://api64.ipify.org)
-    if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "无法获取本机IPv4地址，请手动输入."
-        read -p "请输入本机的IP地址: " local_ip
-        if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo -e "\n${red}错误!${none} 无效的IP地址.\n" && exit 1
+    local ip=$(curl -s http://api64.ipify.org)
+    if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "$ip"
+    else
+        echo "无法自动获取公网IP地址，请手动输入。"
+        read -p "请输入您的公网IP地址: " manual_ip
+        if [[ $manual_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "$manual_ip"
+        else
+            echo "输入的IP地址格式不正确，请重新运行脚本并输入有效的公网IP地址。"
+            exit 1
         fi
     fi
-    echo $local_ip
 }
 
-# 检查是否为ROOT用户
-[[ $EUID != 0 ]] && {
-    echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
-}
 
-# 安装必要工具
-install_tools
+# 显示所有入站配置
+show_inbound_configs() {
+    local config=$(jq '.' "$config_file")
+    echo -e "${green}入站节点配置:${none}"
 
-# 安装xray
-install_xray
+    for i in $(jq -r '.inbounds | keys[]' <<< "$config"); do
+        local port=$(jq -r ".inbounds[$i].port" <<< "$config")
+        local tag=$(jq -r ".inbounds[$i].tag" <<< "$config")
+        local outboundTag=$(jq -r ".routing.rules[] | select(.inboundTag == \"$tag\") | .outboundTag" <<< "$config")
+        local outboundAddr=$(jq -r ".outbounds[] | select(.tag == \"$outboundTag\") | .settings.servers[0].address" <<< "$config")
+        local outboundPort=$(jq -r ".outbounds[] | select(.tag == \"$outboundTag\") | .settings.servers[0].port" <<< "$config")
 
-local_ip=$(get_local_ip)
-
-# 配置文件目录
-config_dir="/usr/local/etc/xray"
-mkdir -p "$config_dir"
-total_config="$config_dir/config.json"
-
-# 声明关联数组
-declare -A vmess_links
-declare -A outbound_addresses
-
-# 寻找未被占用的端口
-find_free_port() {
-    local port=10000
-    while true; do
-        if ! lsof -i:$port &>/dev/null; then
-            echo $port
-            break
-        fi
-        ((port++))
+        echo -e "${yellow}序号: ${i}${none} - 端口: ${port}, 出站地址: ${outboundAddr}:${outboundPort}"
     done
 }
 
-# 创建新节点
-create_node() {
-    local node_num=$1
-    local vmess_port=$(find_free_port)
-    local vmess_id=$(cat /proc/sys/kernel/random/uuid)
+# 添加新节点
+add_new_nodes() {
+    read -p "请输入要添加的节点数量: " num_nodes
+    if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
+        echo -e "${red}错误!${none} 请输入有效的数量。\n"
+        return
+    fi
 
-    # 为入站节点添加出站配置
-    echo "配置第 $node_num 个出站代理 (节点$node_num)"
-    read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
+    local max_port=$(jq '[.inbounds[].port] | max' "$config_file")
+    local start_port=$((max_port+1))
 
-    # 添加新节点到配置文件
-    jq --arg port "$vmess_port" --arg id "$vmess_id" --arg tag "inbound$node_num" --arg addr "$addr" --argjson port "$port" --arg user "$user" --arg pass "$pass" '
-    .inbounds += [{
-        listen: "0.0.0.0",
-        port: ($port | tonumber),
-        protocol: "vmess",
-        settings: { clients: [{ id: $id }] },
-        streamSettings: { network: "ws", security: "none", wsSettings: { path: "/dockerlnmp" } },
-        tag: $tag
-    }] |
-    .outbounds += [{
-        protocol: "socks",
-        settings: { servers: [{ address: $addr, port: ($port | tonumber), users: [{ user: $user, pass: $pass }] }] },
-        tag: ("outbound" + $tag)
-    }]' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
+    for ((i=0; i<num_nodes; i++)); do
+        local new_port=$((start_port+i))
+        local new_tag="inbound$new_port"
+        local new_outbound_tag="outbound$new_port"
+        local new_id=$(uuidgen)
 
-    local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$node_num\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
-    vmess_links[$node_num]="$vmess_link"
-    outbound_addresses[$node_num]="$addr:$port"
+        # 添加入站配置
+        jq --argjson newInbound "
+        {
+            port: $new_port,
+            protocol: 'vmess',
+            settings: { clients: [{ id: '$new_id' }] },
+            streamSettings: { network: 'ws', security: 'none', wsSettings: { path: '/websocket' } },
+            tag: '$new_tag'
+        }" '.inbounds += [$newInbound]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+
+        # 添加出站配置
+        jq --arg newTag "$new_outbound_tag" --arg newAddr "127.0.0.1" --argjson newPort "$new_port" '
+        .outbounds += [{
+            protocol: "socks",
+            settings: { servers: [{ address: $newAddr, port: $newPort }] },
+            tag: $newTag
+        }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+
+        # 添加路由规则
+        jq --arg inTag "$new_tag" --arg outTag "$new_outbound_tag" '
+        .routing.rules += [{ type: "field", inboundTag: [$inTag], outboundTag: $outTag }]
+        ' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+    done
+
+    echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
 }
-
-
 
 # 删除节点
 delete_node() {
-    local del_port=$1
-    jq --argjson delPort $del_port '.inbounds |= map(select(.port != $delPort))' "$total_config" > "$config_dir/tmp_config.json" && mv "$config_dir/tmp_config.json" "$total_config"
+    read -p "请输入要删除的节点序号: " node_index
+    if ! [[ $node_index =~ ^[0-9]+$ ]]; then
+        echo -e "${red}错误!${none} 请输入有效的序号。\n"
+        return
+    fi
+
+    local tag=$(jq -r ".inbounds[$node_index].tag" "$config_file")
+    jq "del(.inbounds[$node_index]) | del(.routing.rules[] | select(.inboundTag == \"$tag\")) | del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+    
+    echo -e "${green}已删除序号为 $node_index 的节点。${none}"
 }
 
-# 菜单逻辑
-while true; do
-    echo -e "\n${green}菜单:${none}"
-    echo "1. 创建新节点"
-    echo "2. 查看所有节点连接信息"
-    echo "3. 删除节点"
-    echo "4. 退出"
+# 主菜单
+main_menu() {
+    while true; do
+        echo -e "\n${green}菜单:${none}"
+        echo "1. 查看所有节点连接信息"
+        echo "2. 新增节点配置"
+        echo "3. 删除节点"
+        echo "4. 退出"
+        read -p "请输入选项: " choice
 
-    read -p "请输入选项: " choice
-    case $choice in
-        1)
-            read -p "请输入要添加的节点数量: " num_nodes
-            if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
-                echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
-            fi
+        case $choice in
+            1) show_inbound_configs ;;
+            2) add_new_nodes ;;
+            3) delete_node ;;
+            4) break ;;
+            *) echo -e "${red}无效的选项，请重新选择。${none}" ;;
+        esac
+    done
+}
 
-            for ((i=1; i<=num_nodes; i++)); do
-                create_node $i
-            done
-
-            systemctl restart xray
-            ;;
-        2)
-            echo -e "\n${yellow}节点链接信息:${none}"
-            config=$(jq '.' "$total_config")
-            for i in $(jq -r '.inbounds | keys[]' <<< "$config"); do
-                local port=$(jq -r ".inbounds[$i].port" <<< "$config")
-                local tag=$(jq -r ".inbounds[$i].tag" <<< "$config")
-                local vmess_id=$(jq -r ".inbounds[$i].settings.clients[0].id" <<< "$config")
-                local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"$tag\",\"add\":\"$local_ip\",\"port\":$port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
-                echo -e "${yellow}节点 $tag 链接:${none} $vmess_link"
-                echo -e "${yellow}节点 $tag 对应的出站地址:${none} ${outbound_addresses[$tag]}"
-            done
-            echo -e "\n节点配置文件路径: ${green}${total_config}${none}"
-            ;;
-        3)
-            read -p "请输入要删除的节点端口号: " del_port
-            if [[ $del_port =~ ^[0-9]+$ ]]; then
-                delete_node $del_port
-                systemctl restart xray
-            else
-                echo -e "\n${red}错误!${none} 无效的端口号.\n"
-            fi
-            ;;
-        4)
-            break
-            ;;
-        *)
-            echo -e "${red}无效的选项，请重新选择。${none}"
-            ;;
-    esac
-done
+check_jq_installed
+local_ip=$(get_local_ip)
+main_menu
