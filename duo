@@ -94,6 +94,8 @@ add_new_nodes() {
     done
 
     echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
+    systemctl restart xray
+    echo -e "${green}Xray 服务已重新启动。${none}"
 }
 
 # 删除节点
@@ -111,6 +113,8 @@ delete_node() {
         jq "del(.routing.rules[] | select(.inboundTag == \"$tag\")) | del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
         echo -e "${green}已关闭端口 $port 的节点。${none}"
+        systemctl restart xray
+        echo -e "${green}Xray 服务已重新启动。${none}"
     done
 }
 
