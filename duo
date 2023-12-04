@@ -140,3 +140,4 @@ main_menu() {
 
 check_jq_installed
 local_ip=$(get_local_ip)
+main_menu
