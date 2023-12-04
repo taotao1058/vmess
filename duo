@@ -48,7 +48,50 @@ show_inbound_configs() {
 
 # 添加新节点
 add_new_nodes() {
-    # ... 保持原有逻辑不变 ...
+    read -p "请输入要添加的节点数量: " num_nodes
+    if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
+        echo -e "${red}错误!${none} 请输入有效的数量。\n"
+        return
+    fi
+
+    local max_port=$(jq '[.inbounds[].port] | max // 10000' "$config_file")
+    local start_port=$((max_port+1))
+
+    for ((i=0; i<num_nodes; i++)); do
+        local new_port=$((start_port+i))
+        local new_tag="inbound$new_port"
+        local new_outbound_tag="outbound$new_port"
+        local new_id=$(uuidgen)
+
+        # 用户输入出站代理信息
+        echo "配置第 $((i+1)) 个出站代理 (节点$new_port)"
+        read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " outbound_addr outbound_port outbound_user outbound_pass
+
+        # 添加入站配置
+        jq --argjson port "$new_port" --arg id "$new_id" --arg tag "$new_tag" '
+        .inbounds += [{
+            port: $port,
+            protocol: "vmess",
+            settings: { clients: [{ id: $id }] },
+            streamSettings: { network: "ws", security: "none", wsSettings: { path: "/websocket" } },
+            tag: $tag
+        }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+
+        # 添加出站配置
+        jq --arg tag "$new_outbound_tag" --arg addr "$outbound_addr" --argjson port "$outbound_port" --arg user "$outbound_user" --arg pass "$outbound_pass" '
+        .outbounds += [{
+            protocol: "socks",
+            settings: { servers: [{ address: $addr, port: $port, users: [{ user: $user, pass: $pass }] }] },
+            tag: $tag
+        }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+
+        # 添加路由规则
+        jq --arg inTag "$new_tag" --arg outTag "$new_outbound_tag" '
+        .routing.rules += [{ type: "field", inboundTag: [$inTag], outboundTag: $outTag }]
+        ' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
+    done
+
+    echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
 }
 
 # 删除节点
