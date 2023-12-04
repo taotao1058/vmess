@@ -6,6 +6,11 @@
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duos && bash duos
 ```
 
+####  节点管理
+```
+wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duo && bash duo
+```
+
 
 
 ---
@@ -24,12 +29,6 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/SS &
 ```
 
 ---
-
-###  优化中
-
-```
-wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duo && bash duo
-```
 
 
 ---
