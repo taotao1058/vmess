@@ -104,51 +104,22 @@ delete_node() {
     IFS=' ' read -r -a port_array <<< "$ports"
 
     for port in "${port_array[@]}"; do
-        local tag=$(jq -r ".inbounds[] | select(.port == $port) | .tag" "$config_file")
-
-        echo "要删除的端口: $port"
-        echo "对应的 tag: $tag"
+        # 直接使用完整路径而非变量
+        local tag=$(jq -r ".inbounds[] | select(.port == $port) | .tag" /usr/local/etc/xray/config.json)
 
         if [ -z "$tag" ]; then
             echo -e "${red}端口 $port 没有找到对应的入站配置。${none}"
             continue
         fi
 
-        # 检查删除前的配置数量
-        local outboundCountBefore=$(jq '[.outbounds[] | select(.tag == "'$tag'")] | length' "$config_file")
-        local routingCountBefore=$(jq '[.routing.rules[] | select(.inboundTag == ["'$tag'"])] | length' "$config_file")
-
-        echo "删除前出站配置数量: $outboundCountBefore"
-        echo "删除前路由规则数量: $routingCountBefore"
-
         # 删除入站配置
-        jq "del(.inbounds[] | select(.port == $port))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
-        echo "已尝试删除端口 $port 的入站配置"
+        jq "del(.inbounds[] | select(.port == $port))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
 
         # 删除对应的出站配置和路由规则
-        jq "del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file" || echo "jq command failed"
-        jq "del(.routing.rules[] | select(.inboundTag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file" || echo "jq command failed"
+        jq "del(.outbounds[] | select(.tag == \"$tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
+        jq "del(.routing.rules[] | select(.inboundTag[] == \"$tag\"))" /usr/local/etc/xray/config.json > /usr/local/etc/xray/config.json.tmp && mv /usr/local/etc/xray/config.json.tmp /usr/local/etc/xray/config.json
 
-        echo "已尝试删除端口 $port 的出站配置和路由规则"
-
-        # 检查删除后的配置数量
-        local outboundCountAfter=$(jq '[.outbounds[] | select(.tag == "'$tag'")] | length' "$config_file")
-        local routingCountAfter=$(jq '[.routing.rules[] | select(.inboundTag == ["'$tag'"])] | length' "$config_file")
-
-        echo "删除后出站配置数量: $outboundCountAfter"
-        echo "删除后路由规则数量: $routingCountAfter"
-
-        if [[ $outboundCountBefore -gt $outboundCountAfter ]]; then
-            echo -e "${green}已删除端口 $port 的出站配置。${none}"
-        else
-            echo -e "${red}未找到或未能删除端口 $port 的出站配置。${none}"
-        fi
-
-        if [[ $routingCountBefore -gt $routingCountAfter ]]; then
-            echo -e "${green}已删除端口 $port 的路由规则。${none}"
-        else
-            echo -e "${red}未找到或未能删除端口 $port 的路由规则。${none}"
-        fi
+        echo -e "${green}已删除端口 $port 的节点。${none}"
     done
 
     systemctl restart xray
