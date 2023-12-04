@@ -5,9 +5,15 @@ yellow='\e[33m'
 green='\e[32m'
 none='\e[0m'
 
-# 检查curl
+# 检查并安装curl
 if ! type curl &>/dev/null; then
     echo -e "\n${red}错误!${none} 需要安装 ${yellow}curl.${none}\n" && exit 1
+fi
+
+# 检查并安装lsof
+if ! type lsof &>/dev/null; then
+    echo -e "\n${yellow}安装 ${green}lsof${none} 工具中...\n"
+    apt-get update && apt-get install -y lsof
 fi
 
 # 检查是否为ROOT用户
@@ -48,28 +54,22 @@ total_config="$config_dir/config.json"
 declare -A vmess_links
 declare -A outbound_addresses
 
-# 检查端口是否被占用并询问是否释放端口
-free_port() {
-    local port=$1
-    local pid=$(lsof -t -i:$port -sTCP:LISTEN)
-    if [ ! -z "$pid" ]; then
-        echo -e "${yellow}警告: 端口 $port 已被进程 $pid 占用.${none}"
-        read -p "是否强制释放端口? [Y/N]: " confirm
-        if [[ $confirm == "Y" || $confirm == "y" ]]; then
-            kill -9 $pid
-            echo -e "${green}端口 $port 已释放.${none}"
-        else
-            echo -e "${red}脚本已停止运行。${none}"
-            exit 1
+# 寻找未被占用的端口
+find_free_port() {
+    local port=10000
+    while true; do
+        if ! lsof -i:$port &>/dev/null; then
+            echo $port
+            break
         fi
-    fi
+        ((port++))
+    done
 }
 
 # 创建新节点
 create_node() {
     local node_num=$1
-    local vmess_port=$((10000 + node_num))
-    free_port $vmess_port
+    local vmess_port=$(find_free_port)
 
     local vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
@@ -118,10 +118,6 @@ while true; do
     read -p "请输入选项: " choice
     case $choice in
         1)
-            read -p "是否保留原有配置? [Y/N]: " keep_config
-            if [[ $keep_config == "N" || $keep_config == "n" ]]; then
-                rm -f "$config_dir"/*.json
-            fi
             read -p "请输入要添加的节点数量: " num_nodes
             if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
                 echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
@@ -136,9 +132,47 @@ while true; do
 
             echo "  ]," >> "$total_config"
             echo "  \"outbounds\": [" >> "$total_config"
+
+            # 添加出站配置
+            for ((i=1; i<=num_nodes; i++)); do
+                echo "配置第 $i 个出站代理 (节点$i)"
+                read -p "请输入出站sk5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
+                outbound_addresses[$i]="$addr:$port"
+
+                cat >> "$total_config" << EOF
+    {
+        "protocol": "socks",
+        "settings": {
+            "servers": [
+                {
+                    "address": "$addr",
+                    "port": $port,
+                    "users": [
+                        {
+                            "user": "$user",
+                            "pass": "$pass"
+                        }
+                    ]
+                }
+            ]
+        },
+        "tag": "outbound$i"
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
+EOF
+            done
+
             echo "  ]," >> "$total_config"
             echo "  \"routing\": {" >> "$total_config"
             echo "    \"rules\": [" >> "$total_config"
+            for ((i=1; i<=num_nodes; i++)); do
+                cat >> "$total_config" << EOF
+    {
+        "type": "field",
+        "inboundTag": ["inbound$i"],
+        "outboundTag": "outbound$i"
+    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
+EOF
+            done
             echo "    ]" >> "$total_config"
             echo "  }" >> "$total_config"
             echo "}" >> "$total_config"
