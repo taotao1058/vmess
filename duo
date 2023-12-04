@@ -65,6 +65,10 @@ add_new_nodes() {
         local new_outbound_tag="outbound$new_port"
         local new_id=$(uuidgen)
 
+        # 用户输入出站代理信息
+        echo "配置第 $((i+1)) 个出站代理 (节点$new_port)"
+        read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " outbound_addr outbound_port outbound_user outbound_pass
+
         # 添加入站配置
         jq --argjson port "$new_port" --arg id "$new_id" --arg tag "$new_tag" '
         .inbounds += [{
@@ -76,10 +80,10 @@ add_new_nodes() {
         }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
         # 添加出站配置
-        jq --arg tag "$new_outbound_tag" --arg addr "127.0.0.1" --argjson port "$new_port" '
+        jq --arg tag "$new_outbound_tag" --arg addr "$outbound_addr" --argjson port "$outbound_port" --arg user "$outbound_user" --arg pass "$outbound_pass" '
         .outbounds += [{
             protocol: "socks",
-            settings: { servers: [{ address: $addr, port: $port }] },
+            settings: { servers: [{ address: $addr, port: $port, users: [{ user: $user, pass: $pass }] }] },
             tag: $tag
         }]' "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
 
@@ -91,8 +95,6 @@ add_new_nodes() {
 
     echo -e "${green}已成功添加 $num_nodes 个节点。${none}"
 }
-
-
 
 # 删除节点
 delete_node() {
