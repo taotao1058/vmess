@@ -5,39 +5,17 @@ yellow='\e[33m'
 green='\e[32m'
 none='\e[0m'
 
-# 自动安装curl
-install_curl() {
-    if [[ -x "$(command -v apt-get)" ]]; then
-        apt-get update
-        apt-get install -y curl
-    elif [[ -x "$(command -v yum)" ]]; then
-        yum install -y curl
-    else
-        echo -e "\n${red}错误!${none} 无法安装 ${yellow}curl.${none} 未知的包管理器.\n" && exit 1
-    fi
-}
-
-free_port() {
-    port="$1"
-    while true; do
-        if [[ $(netstat -tuln | grep ":$port") ]]; then
-            port=$((port + 1))
-        else
-            echo "$port"
-            break
-        fi
-    done
-}
-
+# 检查curl
 if ! type curl &>/dev/null; then
-    echo -e "\n${red}错误!${none} 未找到 ${yellow}curl.${none} 正在安装...\n"
-    install_curl
+    echo -e "\n${red}错误!${none} 需要安装 ${yellow}curl.${none}\n" && exit 1
 fi
 
+# 检查是否为ROOT用户
 [[ $EUID != 0 ]] && {
     echo -e "\n${red}错误!${none} 当前非 ${yellow}ROOT用户.${none}请执行sudo -i命令后再运行\n" && exit 1
 }
 
+# 检查并安装xray
 if type xray &>/dev/null; then
     echo "检测到 xray 已安装，继续执行后续步骤."
 else
@@ -48,50 +26,54 @@ else
     fi
 fi
 
-local_ip=$(curl -s http://api64.ipify.org)
-if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "无法获取本机IPv4地址，请手动输入."
-    read -p "请输入本机的IP地址: " local_ip
+# 获取本机IP地址
+get_local_ip() {
+    local_ip=$(curl -s http://api64.ipify.org)
     if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo -e "\n${red}错误!${none} 无效的IP地址.\n" && exit 1
+        echo "无法获取本机IPv4地址，请手动输入."
+        read -p "请输入本机的IP地址: " local_ip
+        if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo -e "\n${red}错误!${none} 无效的IP地址.\n" && exit 1
+        fi
     fi
-fi
+    echo $local_ip
+}
 
+# 配置文件目录
 config_dir="/usr/local/etc/xray"
 mkdir -p "$config_dir"
-
 total_config="$config_dir/config.json"
-echo "{" > "$total_config"
-echo "  \"inbounds\": [" >> "$total_config"
 
+# 声明关联数组
 declare -A vmess_links
 declare -A outbound_addresses
 
-while true; do
-    echo -e "\n${green}菜单:${none}"
-    echo "1. 部署新节点(保留原有节点)"
-    echo "2. 查询所有的节点链接"
-    echo "3. 删除节点"
-    echo "4. 退出"
+# 检查端口是否被占用并询问是否释放端口
+free_port() {
+    local port=$1
+    local pid=$(lsof -t -i:$port -sTCP:LISTEN)
+    if [ ! -z "$pid" ]; then
+        echo -e "${yellow}警告: 端口 $port 已被进程 $pid 占用.${none}"
+        read -p "是否强制释放端口? [Y/N]: " confirm
+        if [[ $confirm == "Y" || $confirm == "y" ]]; then
+            kill -9 $pid
+            echo -e "${green}端口 $port 已释放.${none}"
+        else
+            echo -e "${red}脚本已停止运行。${none}"
+            exit 1
+        fi
+    fi
+}
 
-    read -p "请输入菜单选项: " choice
-    case $choice in
-        1)
-            read -p "请输入需要配置的节点数量: " num_nodes
-            # 用户是否保留之前的入站和出站配置
-            read -p "是否保留之前的入站和出站配置？ [Y/N]: " keep_config
-            if [[ $keep_config == "N" || $keep_config == "n" ]]; then
-                # 删除现有的xray配置文件
-                rm -f "$config_dir"/*.json
-            fi
+# 创建新节点
+create_node() {
+    local node_num=$1
+    local vmess_port=$((10000 + node_num))
+    free_port $vmess_port
 
-            echo "  \"inbounds\": [" >> "$total_config"
+    local vmess_id=$(cat /proc/sys/kernel/random/uuid)
 
-            for ((i=1; i<=num_nodes; i++)); do
-                vmess_port=$(free_port 10000)
-                vmess_id=$(cat /proc/sys/kernel/random/uuid)
-
-                cat >> "$total_config" << EOF
+    cat >> "$total_config" << EOF
     {
         "listen": "0.0.0.0",
         "port": $vmess_port,
@@ -110,116 +92,79 @@ while true; do
                 "path": "/dockerlnmp"
             }
         },
-        "tag": "inbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
+        "tag": "inbound$node_num"
+    }$(if [[ $node_num -lt $num_nodes ]]; then echo ","; fi)
 EOF
 
-                vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$i\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
-                vmess_links[$i]="$vmess_link"
+    local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$node_num\",\"add\":\"$local_ip\",\"port\":$vmess_port,\"id\":\"$vmess_id\",\"aid\":0,\"net\":\"ws\",\"path\":\"/dockerlnmp\",\"type\":\"none\"}" | base64 -w 0)"
+    vmess_links[$node_num]="$vmess_link"
+}
+
+# 删除节点
+delete_node() {
+    local del_port=$1
+    # 假设配置文件中每个端口的配置占据一个独立的行
+    sed -i "/\"port\": $del_port/d" "$total_config"
+}
+
+# 菜单逻辑
+while true; do
+    echo -e "\n${green}菜单:${none}"
+    echo "1. 创建新节点"
+    echo "2. 查看所有节点连接信息"
+    echo "3. 删除节点"
+    echo "4. 退出"
+
+    read -p "请输入选项: " choice
+    case $choice in
+        1)
+            read -p "是否保留原有配置? [Y/N]: " keep_config
+            if [[ $keep_config == "N" || $keep_config == "n" ]]; then
+                rm -f "$config_dir"/*.json
+            fi
+            read -p "请输入要添加的节点数量: " num_nodes
+            if ! [[ $num_nodes =~ ^[0-9]+$ ]]; then
+                echo -e "\n${red}错误!${none} 无效的数量.\n" && exit 1
+            fi
+
+            echo "{" > "$total_config"
+            echo "  \"inbounds\": [" >> "$total_config"
+
+            for ((i=1; i<=num_nodes; i++)); do
+                create_node $i
             done
 
             echo "  ]," >> "$total_config"
             echo "  \"outbounds\": [" >> "$total_config"
-
-            for ((i=1; i<=num_nodes; i++)); do
-                echo "配置第 $i 个出站代理 (节点$i)"
-                read -p "请输入出站sk5地址, 端口, 用户名, 密码 (以空格分隔): " addr port user pass
-
-                outbound_addresses[$i]="$addr:$port"
-
-                cat >> "$total_config" << EOF
-    {
-        "protocol": "socks",
-        "settings": {
-            "servers": [
-                {
-                    "address": "$addr",
-                    "port": $port,
-                    "users": [
-                        {
-                            "user": "$user",
-                            "pass": "$pass"
-                        }
-                    ]
-                }
-            ]
-        },
-        "tag": "outbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
-EOF
-            done
-
             echo "  ]," >> "$total_config"
-
-            # 添加路由规则
             echo "  \"routing\": {" >> "$total_config"
             echo "    \"rules\": [" >> "$total_config"
-            for ((i=1; i<=num_nodes; i++)); do
-                cat >> "$total_config" << EOF
-    {
-        "type": "field",
-        "inboundTag": ["inbound$i"],
-        "outboundTag": "outbound$i"
-    }$(if [[ $i -lt $num_nodes ]]; then echo ","; fi)
-EOF
-            done
             echo "    ]" >> "$total_config"
             echo "  }" >> "$total_config"
-
             echo "}" >> "$total_config"
 
-            if [[ $num_nodes -gt 0 ]]; then
-                systemctl restart xray
-                echo -e "${green}启动成功！节点配置文件路径为：${config_dir}${none}"
-
-                echo -e "\n${yellow}（TG交流群：@kexueshangwang8）（此脚本为大漂亮所写）节点链接和对应的出站代理信息:${none}"
-                for ((i=1; i<=num_nodes; i++)); do
-                    echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
-                    echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
-                done
-            fi
+            systemctl restart xray
             ;;
         2)
-            # 查询所有节点链接的逻辑，可以输出已配置节点的链接
-            if [[ $num_nodes -gt 0 ]]; then
-                echo -e "\n${yellow}节点链接和对应的出站代理信息:${none}"
-                for ((i=1; i<=num_nodes; i++)); do
-                    echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
-                    echo -e "${yellow}节点 $i 对应的落地sk5地址:${none} ${outbound_addresses[$i]}"
-                done
-            else
-                echo -e "\n${red}未找到已配置的节点信息.${none}"
-            fi
+            echo -e "\n${yellow}节点链接信息:${none}"
+            for i in "${!vmess_links[@]}"; do
+                echo -e "${yellow}节点 $i 链接:${none} ${vmess_links[$i]}"
+            done
             ;;
         3)
-            # 删除节点的逻辑，可以根据用户选择删除指定节点的配置文件
-            if [[ $num_nodes -gt 0 ]]; then
-                read -p "请输入要删除的节点编号 (1-$num_nodes，多个用空格分隔): " node_numbers
-                IFS=" " read -ra node_numbers <<< "$node_numbers"
-                deleted=0
-                for node_number in "${node_numbers[@]}"; do
-                    if [[ $node_number -ge 1 && $node_number -le $num_nodes ]]; then
-                        rm -f "$config_dir"/inbound"$node_number"_*.json
-                        rm -f "$config_dir"/outbound"$node_number"_*.json
-                        echo "节点 $node_number 已删除。"
-                        deleted=1
-                    else
-                        echo "无效的节点编号: $node_number"
-                    fi
-                done
-                if [[ $deleted -eq 1 ]]; then
-                    systemctl restart xray
-                    echo "Xray 已重启以应用更改。"
-                fi
+            read -p "请输入要删除的节点端口号: " del_port
+            if [[ $del_port =~ ^[0-9]+$ ]]; then
+                delete_node $del_port
+                systemctl restart xray
             else
-                echo -e "\n${red}未找到已配置的节点信息，无法删除节点.${none}"
+                echo -e "\n${red}错误!${none} 无效的端口号.\n"
             fi
             ;;
         4)
-            exit 0
+            break
             ;;
         *)
-            echo "无效的选项，请重新选择。"
+            echo -e "${red}无效的选项，请重新选择。${none}"
             ;;
     esac
 done
