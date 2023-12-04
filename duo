@@ -117,8 +117,8 @@ delete_node() {
 # 主菜单
 main_menu() {
     while true; do
-        echo -e "\n${green}菜单:${none}"
-        echo "1. 查看所有节点连接信息"
+        echo -e "\n${green}（此脚本需运行前置脚本之后才能运行）菜单:${none}"
+        echo "1. 查看所有节点"
         echo "2. 新增节点配置"
         echo "3. 删除节点"
         echo "4. 退出"
