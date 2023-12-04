@@ -40,7 +40,9 @@ show_inbound_configs() {
     for ((i = 0; i < length; i++)); do
         local port=$(jq -r ".inbounds[$i].port" <<< "$config")
         local id=$(jq -r ".inbounds[$i].settings.clients[0].id" <<< "$config")
-        local vmess_link="vmess://$(echo -n "{\"add\":\"$local_ip\",\"aid\":\"0\",\"host\":\"\",\"id\":\"$id\",\"net\":\"ws\",\"path\":\"\",\"port\":\"$port\",\"ps\":\"\",\"tls\":\"\",\"type\":\"none\",\"v\":\"2\"}" | base64 -w 0)"
+        local path=$(jq -r ".inbounds[$i].streamSettings.wsSettings.path" <<< "$config")
+
+        local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$(($i + 1))\",\"add\":\"$local_ip\",\"port\":$port,\"id\":\"$id\",\"aid\":0,\"net\":\"ws\",\"path\":\"$path\",\"type\":\"none\"}" | base64 -w 0)"
 
         echo -e "${yellow}序号: $(($i + 1))${none} - 端口: ${port}, Vmess 链接: ${vmess_link}"
     done
