@@ -109,8 +109,6 @@ delete_node() {
         if [ -z "$tag" ]; then
             echo -e "${red}端口 $port 没有找到对应的入站配置。${none}"
             continue
-        else
-            echo -e "${yellow}找到端口 $port 对应的标签 $tag，准备删除相关配置。${none}"
         fi
 
         # 删除入站配置
@@ -118,8 +116,20 @@ delete_node() {
         echo -e "${green}已删除端口 $port 的入站配置。${none}"
 
         # 删除对应的出站配置和路由规则
-        jq "del(.routing.rules[] | select(.inboundTag == \"$tag\")) | del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
-        echo -e "${green}已删除对应的出站配置和路由规则。${none}"
+        local outboundDeleted=$(jq "del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file")
+        local routingDeleted=$(jq "del(.routing.rules[] | select(.inboundTag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file")
+        
+        if [ -z "$outboundDeleted" ]; then
+            echo -e "${red}未找到或未能删除端口 $port 的出站配置。${none}"
+        else
+            echo -e "${green}已删除端口 $port 的出站配置。${none}"
+        fi
+
+        if [ -z "$routingDeleted" ]; then
+            echo -e "${red}未找到或未能删除端口 $port 的路由规则。${none}"
+        else
+            echo -e "${green}已删除端口 $port 的路由规则。${none}"
+        fi
     done
 
     systemctl restart xray
