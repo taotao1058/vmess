@@ -70,13 +70,15 @@ check_and_install_curl() {
 }
 
 # 检查并安装xray
-check_and_install_xray() {
+if type xray &>/dev/null; then
+    echo "检测到 xray 已安装，继续执行后续步骤."
+else
+    echo "正在安装 xray..."
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)"
     if ! type xray &>/dev/null; then
-        echo -e "${yellow}正在安装 xray...${none}"
-        # 添加安装xray的命令
-        # 例如：apt-get install -y xray
+        echo -e "\n${red}错误!${none} xray 安装失败，请检查安装脚本是否正常运行.\n" && exit 1
     fi
-}
+fi
 
 # 检查 jq 工具是否安装
 check_jq_installed() {
