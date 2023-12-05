@@ -121,7 +121,7 @@ get_local_ip() {
     fi
 }
 
-# 显示所有入站配置和 Vmess 链接以及对应的出站配置
+# 显示所有入站配置和 Vmess 链接以及对应的出站配置（只显示地址、端口、用户名和密码）
 show_inbound_configs() {
     local local_ip=$(get_local_ip)  # 获取本机IP
 
@@ -146,10 +146,10 @@ show_inbound_configs() {
         local outbound_tag="outbound$port"
 
         # 根据构造的标签查找对应的出站配置
-        local outbound_config=$(jq --arg tag "$outbound_tag" '.[] | select(.tag == $tag)' <<< "$outbounds")
+        local outbound_config=$(jq --arg tag "$outbound_tag" '.[] | select(.tag == $tag) | .settings.servers[] | {address, port, user: .users[0].user, pass: .users[0].pass}' <<< "$outbounds")
         
         if [[ ! -z $outbound_config ]]; then
-            echo -e "${green}出站配置:${none} $outbound_config"
+            echo -e "${green}出站配置:${none} 地址: $(jq -r '.address' <<< "$outbound_config"), 端口: $(jq -r '.port' <<< "$outbound_config"), 用户名: $(jq -r '.user' <<< "$outbound_config"), 密码: $(jq -r '.pass' <<< "$outbound_config")"
         else
             echo -e "${red}未找到对应的出站配置。${none}"
         fi
