@@ -118,11 +118,11 @@ show_inbound_configs() {
     local config=$(jq '.inbounds | map(select(.port != 9999))' "$config_file")
     echo -e "${green}入站节点配置:${none}"
 
-    local length=$(jq '. | length' <<< "$config")
+    local length=$(jq '.inbounds | length' <<< "$config")
     for ((i = 0; i < length; i++)); do
-        local port=$(jq -r ".[$i].port" <<< "$config")
-        local id=$(jq -r ".[$i].settings.clients[0].id" <<< "$config")
-        local path=$(jq -r ".[$i].streamSettings.wsSettings.path" <<< "$config")
+        local port=$(jq -r ".inbounds[$i].port" <<< "$config")
+        local id=$(jq -r ".inbounds[$i].settings.clients[0].id" <<< "$config")
+        local path=$(jq -r ".inbounds[$i].streamSettings.wsSettings.path" <<< "$config")
 
         local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$(($i + 1))\",\"add\":\"$local_ip\",\"port\":$port,\"id\":\"$id\",\"aid\":0,\"net\":\"ws\",\"path\":\"$path\",\"type\":\"none\"}" | base64 -w 0)"
 
