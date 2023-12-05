@@ -124,7 +124,10 @@ show_inbound_configs() {
         local id=$(jq -r ".[$i].settings.clients[0].id" <<< "$config")
         local path=$(jq -r ".[$i].streamSettings.wsSettings.path" <<< "$config")
 
-        local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$(($i + 1))\",\"add\":\"$local_ip\",\"port\":$port,\"id\":\"$id\",\"aid\":0,\"net\":\"ws\",\"path\":\"$path\",\"type\":\"none\"}" | base64 -w 0)"
+        # 将节点地址设置为本机IP
+        local node_address="$local_ip"
+
+        local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$(($i + 1))\",\"add\":\"$node_address\",\"port\":$port,\"id\":\"$id\",\"aid\":0,\"net\":\"ws\",\"path\":\"$path\",\"type\":\"none\"}" | base64 -w 0)"
 
         echo -e "${yellow}序号: $(($i + 1))${none} - 端口: ${port}, Vmess 链接: ${vmess_link}"
     done
