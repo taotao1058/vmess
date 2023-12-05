@@ -23,7 +23,7 @@ default_config='
             "network": "ws",
             "security": "none",
             "wsSettings": {
-                "path": "/dockerlnmp"
+                "path": "/morenbukeyong"
             }
         },
         "tag": "inbound0"
@@ -138,7 +138,7 @@ add_new_nodes() {
         return
     fi
 
-    local max_port=$(jq '[.inbounds[].port] | max // 10001' "$config_file")
+    local max_port=$(jq '[.inbounds[].port] | max // 10000' "$config_file")
     local start_port=$((max_port+1))
 
     for ((i=0; i<num_nodes; i++)); do
@@ -203,7 +203,7 @@ delete_node() {
 # 主菜单
 main_menu() {
     while true; do
-        echo -e "\n${green}菜单:${none}"
+        echo -e "\n${green}(xray节点配置文件路径：/usr/local/etc/xray）菜单:${none}"
         echo "1. 查看所有节点"
         echo "2. 新增节点配置"
         echo "3. 删除节点（暂时不可用）"
