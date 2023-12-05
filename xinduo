@@ -77,9 +77,24 @@ check_and_install_xray() {
     fi
 }
 
+# 检查是否已存在入站配置
+check_existing_inbound_config() {
+    local config=$(jq '.inbounds' "$config_file")
+    if [ "$config" != "null" ]; then
+        return 0  # 已存在入站配置
+    else
+        return 1  # 不存在入站配置
+    fi
+}
+
 # 创建默认配置文件
 create_default_config() {
-    echo "$default_config" > "$config_file"
+    if ! check_existing_inbound_config; then
+        echo "$default_config" > "$config_file"
+        echo -e "${green}已创建默认配置文件。${none}"
+    else
+        echo -e "${yellow}入站配置已存在，跳过创建默认配置文件。${none}"
+    fi
 }
 
 # 获取本机公网 IP
