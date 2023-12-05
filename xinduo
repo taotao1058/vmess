@@ -133,7 +133,8 @@ show_inbound_configs() {
 
         local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$(($i + 1))\",\"add\":\"$outbound_addr\",\"port\":$outbound_port,\"id\":\"$id\",\"aid\":0,\"net\":\"ws\",\"path\":\"$path\",\"type\":\"none\",\"user\":\"$outbound_user\",\"pass\":\"$outbound_pass\"}" | base64 -w 0)"
 
-        echo -e "${yellow}序号: $(($i + 1))${none} - 端口: ${port}, Vmess 链接: ${vmess_link}"
+        echo -e "${yellow}序号: $(($i + 1))${none} - 端口: ${port}"
+        echo -e "Vmess 链接: ${vmess_link}"
     done
 }
 
