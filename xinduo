@@ -115,6 +115,8 @@ get_local_ip() {
 
 # 显示所有入站配置和 Vmess 链接
 show_inbound_configs() {
+    local local_ip=$(get_local_ip)  # 获取本机IP
+
     local config=$(jq '.inbounds | map(select(.port != 9999))' "$config_file")
     echo -e "${green}入站节点配置:${none}"
 
