@@ -189,7 +189,7 @@ add_new_nodes() {
 # 主菜单
 main_menu() {
     while true; do
-        echo -e "\n${green}(xray节点配置文件路径：/usr/local/etc/xray）菜单:${none}"
+        echo -e "\n${green} xray节点配置文件路径：/usr/local/etc/xray 菜单:${none}"
         echo "1. 查看所有节点"
         echo "2. 新增节点配置"
         echo "4. 退出"
