@@ -79,8 +79,7 @@ check_and_install_xray() {
 
 # 检查是否已存在入站配置
 check_existing_inbound_config() {
-    local config=$(jq '.inbounds' "$config_file")
-    if [ "$config" != "null" ]; then
+    if grep -q '"tag":' "$config_file"; then
         return 0  # 已存在入站配置
     else
         return 1  # 不存在入站配置
@@ -139,7 +138,7 @@ add_new_nodes() {
         return
     fi
 
-    local max_port=$(jq '[.inbounds[].port] | max // 10000' "$config_file")
+    local max_port=$(jq '[.inbounds[].port] | max // 10001' "$config_file")
     local start_port=$((max_port+1))
 
     for ((i=0; i<num_nodes; i++)); do
@@ -204,7 +203,7 @@ delete_node() {
 # 主菜单
 main_menu() {
     while true; do
-        echo -e "\n${green}（xray节点配置文件路径为：/usr/local/etc/xray）菜单:${none}"
+        echo -e "\n${green}菜单:${none}"
         echo "1. 查看所有节点"
         echo "2. 新增节点配置"
         echo "3. 删除节点（暂时不可用）"
