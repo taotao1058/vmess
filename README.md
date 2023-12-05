@@ -3,14 +3,8 @@
 
 ##  一键快速配置二级代理脚本可配置多个出站（vmess+ws前置）
 ```
-wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duos && bash duos
+wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/xinduo && bash xinduo
 ```
-
-####  节点管理
-```
-wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/duo && bash duo
-```
-
 
 
 ---
