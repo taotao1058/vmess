@@ -152,6 +152,13 @@ add_new_nodes() {
         local new_outbound_tag="outbound$new_port"
         local new_id=$(uuidgen)
 
+        # 检查端口是否已被占用，如果是，则释放端口
+        if netstat -tuln | grep -q ":$new_port "; then
+            echo -e "${yellow}端口 $new_port 已被占用，正在尝试释放...${none}"
+            fuser -k -n tcp $new_port
+            sleep 1
+        fi
+
         # 用户输入出站代理信息
         echo "配置第 $((i+1)) 个出站代理 (节点$new_port)"
         read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " outbound_addr outbound_port outbound_user outbound_pass
