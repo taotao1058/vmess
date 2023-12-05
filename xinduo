@@ -77,6 +77,21 @@ check_and_install_xray() {
     fi
 }
 
+# 检查是否已安装net-tools包，如未安装则进行安装
+check_and_install_net_tools() {
+    if ! type netstat &>/dev/null; then
+        echo -e "${yellow}未安装net-tools包。正在进行安装...${none}"
+        if type apt-get &>/dev/null; then
+            sudo apt-get update && sudo apt-get install -y net-tools
+        elif type yum &>/dev/null; then
+            sudo yum install -y net-tools
+        else
+            echo -e "${red}不支持的软件包管理器。请手动安装net-tools包。${none}"
+            exit 1
+        fi
+    fi
+}
+
 # 检查是否已存在入站配置
 check_existing_inbound_config() {
     if grep -q '"tag":' "$config_file"; then
