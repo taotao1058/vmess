@@ -1,11 +1,14 @@
-# vmess前置落地sk5代理
+# vmess前置落地sk5代理（适用于Ubuntu系统）
 ---
 
-##  一键快速配置二级代理脚本可配置多个出站（vmess+ws前置）
+##  一键快速
 ```
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/xinduo && bash xinduo
 ```
-
+---
+#####  特点：快速批量搭建二级代理
+#####        可管理节点新增和删除
+#####        小白可用 操作简单
 
 ---
 ###  自用静态格式（vmess+ws前置）
