@@ -1,7 +1,7 @@
 # vmess前置落地sk5代理（适用于Ubuntu系统）
 ---
 
-##  一键快速
+##  一键脚本快速搭建
 ```
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/xinduo && bash xinduo
 ```
