@@ -77,21 +77,6 @@ check_and_install_xray() {
     fi
 }
 
-# 检查是否已安装net-tools包，如未安装则进行安装
-check_and_install_net_tools() {
-    if ! type netstat &>/dev/null; then
-        echo -e "${yellow}未安装net-tools包。正在进行安装...${none}"
-        if type apt-get &>/dev/null; then
-            sudo apt-get update && sudo apt-get install -y net-tools
-        elif type yum &>/dev/null; then
-            sudo yum install -y net-tools
-        else
-            echo -e "${red}不支持的软件包管理器。请手动安装net-tools包。${none}"
-            exit 1
-        fi
-    fi
-}
-
 # 检查是否已存在入站配置
 check_existing_inbound_config() {
     if grep -q '"tag":' "$config_file"; then
@@ -167,13 +152,6 @@ add_new_nodes() {
         local new_outbound_tag="outbound$new_port"
         local new_id=$(uuidgen)
 
-        # 检查端口是否已被占用，如果是，则释放端口
-        if netstat -tuln | grep -q ":$new_port "; then
-            echo -e "${yellow}端口 $new_port 已被占用，正在尝试释放...${none}"
-            fuser -k -n tcp $new_port
-            sleep 1
-        fi
-
         # 用户输入出站代理信息
         echo "配置第 $((i+1)) 个出站代理 (节点$new_port)"
         read -p "请输入出站socks5地址, 端口, 用户名, 密码 (以空格分隔): " outbound_addr outbound_port outbound_user outbound_pass
@@ -208,40 +186,18 @@ add_new_nodes() {
     echo -e "${green}Xray 服务已重新启动。${none}"
 }
 
-# 删除节点
-delete_node() {
-    read -p "请输入要删除的节点端口号（多个用空格隔开）: " ports
-    IFS=' ' read -r -a port_array <<< "$ports"
-
-    for port in "${port_array[@]}"; do
-        local tag=$(jq -r ".inbounds[] | select(.port == $port) | .tag" "$config_file")
-
-        # 删除入站配置
-        jq "del(.inbounds[] | select(.port == $port))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
-        
-        # 删除对应的出站配置和路由规则
-        jq "del(.routing.rules[] | select(.inboundTag == \"$tag\")) | del(.outbounds[] | select(.tag == \"$tag\"))" "$config_file" > "$config_file.tmp" && mv "$config_file.tmp" "$config_file"
-
-        echo -e "${green}已关闭端口 $port 的节点。${none}"
-        systemctl restart xray
-        echo -e "${green}Xray 服务已重新启动。${none}"
-    done
-}
-
 # 主菜单
 main_menu() {
     while true; do
         echo -e "\n${green}(xray节点配置文件路径：/usr/local/etc/xray）菜单:${none}"
         echo "1. 查看所有节点"
         echo "2. 新增节点配置"
-        echo "3. 删除节点（暂时不可用）"
         echo "4. 退出"
         read -p "请输入选项: " choice
 
         case $choice in
             1) show_inbound_configs ;;
             2) add_new_nodes ;;
-            3) delete_node ;;
             4) break ;;
             *) echo -e "${red}无效的选项，请重新选择。${none}" ;;
         esac
