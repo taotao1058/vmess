@@ -77,14 +77,6 @@ check_and_install_xray() {
     fi
 }
 
-# 检查 jq 工具是否安装
-check_jq_installed() {
-    if ! type jq &>/dev/null; then
-        echo -e "${yellow}正在安装 jq 工具...${none}"
-        apt-get update && apt-get install -y jq
-    fi
-}
-
 # 创建默认配置文件
 create_default_config() {
     echo "$default_config" > "$config_file"
@@ -197,7 +189,7 @@ delete_node() {
 # 主菜单
 main_menu() {
     while true; do
-        echo -e "\n${green}（此脚本需运行前置脚本之后才能运行）菜单:${none}"
+        echo -e "\n${green}菜单:${none}"
         echo "1. 查看所有节点"
         echo "2. 新增节点配置"
         echo "3. 删除节点（暂时不可用）"
@@ -217,6 +209,5 @@ main_menu() {
 check_and_install_curl
 check_and_install_xray
 create_default_config
-check_jq_installed
-local_ip=$(get_local_ip)
+get_local_ip
 main_menu
