@@ -213,6 +213,7 @@ main_menu() {
 }
 
 check_and_install_curl
+check_and_install_jq
 check_and_install_xray
 create_default_config
 get_local_ip
