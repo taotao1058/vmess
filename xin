@@ -127,7 +127,6 @@ show_inbound_configs() {
 
     local config=$(jq '.inbounds | map(select(.port != 9999))' "$config_file")
     local outbounds=$(jq '.outbounds' "$config_file")
-    local routing_rules=$(jq '.routing.rules' "$config_file")
     echo -e "${green}入站节点配置:${none}"
 
     local length=$(jq '. | length' <<< "$config")
@@ -135,13 +134,6 @@ show_inbound_configs() {
         local port=$(jq -r ".[$i].port" <<< "$config")
         local id=$(jq -r ".[$i].settings.clients[0].id" <<< "$config")
         local path=$(jq -r ".[$i].streamSettings.wsSettings.path" <<< "$config")
-        local inbound_tag=$(jq -r ".[$i].tag" <<< "$config")
-
-        # 获取对应出站配置的标签
-        local outbound_tag=$(jq --arg tag "$inbound_tag" '.[] | select(.inboundTag[] == $tag) | .outboundTag' <<< "$routing_rules")
-
-        # 获取对应的出站配置
-        local outbound=$(jq --arg tag "$outbound_tag" '.[] | select(.tag == $tag)' <<< "$outbounds")
 
         # 将节点地址设置为本机IP
         local node_address="$local_ip"
@@ -149,8 +141,15 @@ show_inbound_configs() {
         local vmess_link="vmess://$(echo -n "{\"v\":\"2\",\"ps\":\"节点$(($i + 1))\",\"add\":\"$node_address\",\"port\":$port,\"id\":\"$id\",\"aid\":0,\"net\":\"ws\",\"path\":\"$path\",\"type\":\"none\"}" | base64 -w 0)"
 
         echo -e "${yellow}节点: $(($i + 1))${none} - 端口: ${port}, Vmess 链接: ${vmess_link}"
-        if [[ $outbound != "null" ]]; then
-            echo -e "${green}出站配置:${none} $outbound"
+        
+        # 构造出站配置的标签
+        local outbound_tag="outbound$port"
+
+        # 根据构造的标签查找对应的出站配置
+        local outbound_config=$(jq --arg tag "$outbound_tag" '.[] | select(.tag == $tag)' <<< "$outbounds")
+        
+        if [[ ! -z $outbound_config ]]; then
+            echo -e "${green}出站配置:${none} $outbound_config"
         else
             echo -e "${red}未找到对应的出站配置。${none}"
         fi
