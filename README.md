@@ -5,7 +5,7 @@
 ```
 wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/xinduo && bash xinduo
 ```
----
+
 #####  特点：快速批量搭建二级代理
 #####        可管理节点新增和删除
 #####        小白可用 操作简单
