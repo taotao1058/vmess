@@ -39,7 +39,7 @@ read -p "请输入落地 SOCKS5 用户名: " socks5_username
 read -p "请输入落地 SOCKS5 密码: " socks5_password
 
 # Get local IPv4 address
-local_ip=$(curl -s http://api64.ipify.org)
+local_ip=$(curl -s http://ipinfo.io/ip)
 
 # Check if local_ip is a valid IPv4 address
 if [[ ! $local_ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
