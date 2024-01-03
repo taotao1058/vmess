@@ -11,11 +11,6 @@ wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/xind
 #####        小白可用 操作简单
 
 ---
-###  自用静态格式（vmess+ws前置）
-
-```
-wget -N --no-check-certificate https://github.com/taotao1058/vmess/raw/main/ziyong && bash ziyong
-```
 
 ---
 
